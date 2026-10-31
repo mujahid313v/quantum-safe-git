@@ -120,14 +120,14 @@ quantum-safe-git/
 ```mermaid
 graph LR
     subgraph "Developer Machine"
-        A[Git Hooks (Rust)] --> B[Signature Service (Go)]
+        A[Git Hooks] --> B[Signature Service]
         C[Desktop UI] --> D[IDE Extensions]
         E[CLI Tools] --> D
     end
 
     subgraph "Enterprise Network"
         F[Central Policy Service]
-        G[Key Repository (HSM/Cloud)]
+        G[Key Repository]
         H[Central Audit Log]
         I[CI/CD Pipeline]
     end
