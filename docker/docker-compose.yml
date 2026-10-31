@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  signature-service:
+    build: ./go
+    ports:
+      - "50051:50051"
+    environment:
+      - LOG_LEVEL=info
+      - KEY_REPOSITORY_TYPE=local
+      - KEY_REPOSITORY_PATH=/app/keys
+    volumes:
+      - ./keys:/app/keys:ro   # mount keys (never commit these)
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
