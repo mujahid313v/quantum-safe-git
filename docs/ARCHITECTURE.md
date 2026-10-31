@@ -37,9 +37,9 @@ QSGit implements a **modular, cloud-native** architecture that combines low-leve
 
 ```mermaid
 graph TD
-    U[Developer] --> GH[Git Hook (Rust)]
-    GH --> SS[Signature Service (Go)]
-    SS --> KR[Key Repository (HSM/Cloud)]
+    U[Developer] --> GH[Git Hook]
+    GH --> SS[Signature Service]
+    SS --> KR[Key Repository]
     KR --> GH
     GH --> C[Commit with Embedded Signature]
 ```
