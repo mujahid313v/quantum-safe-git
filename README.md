@@ -33,6 +33,30 @@ Whether you’re protecting mission‑critical software, contributing to open‑
 | **Complete Audit Trail** | Immutable logs and blockchain‑ready reporting |
 
 
+## 🛠️ Development Environment Setup
+
+### Prerequisites
+- **Docker** – for the signature service and local development stack
+- **Rust** (`cargo`) – for the Git hook plugin and LSP server
+- **Go** (`go`) – for the signature service and CLI tools
+- **Node.js** (`npm`) – for the Desktop UI and IDE extensions
+- **VS Code** – with recommended extensions
+
+### Setup Steps
+1. Clone the repository
+2. Start backend services (`docker compose up -d`)
+3. Install the Git hook plugin
+4. Build and run the signature service
+5. Build and run the CLI verification tool
+6. Run the Desktop UI
+
+### Pre-commit Hooks
+- Install and configure pre-commit hooks for linting and formatting.
+
+### Gitpod / SpaceVim
+- Configure cloud development environment (Gitpod) and editor (SpaceVim) for local development.
+
+
 ## 🧭 Project Structure Overview
 
 ```
