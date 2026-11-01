@@ -20,7 +20,7 @@ impl KeyManager {
     }
 
     /// Stores a key.
-    pub fn store(&self, key_id: &str, key: &[u8]) {
+    pub fn store(&mut self, key_id: &str, key: &[u8]) {
         self.keys.insert(key_id.to_string(), key.to_vec());
     }
 }

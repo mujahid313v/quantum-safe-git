@@ -69,7 +69,7 @@ fn sign_dilithium3(payload: &[u8]) -> Result<Vec<u8>, Error> {
 fn verify_dilithium3(payload: &[u8], signature: &[u8]) -> Result<bool, Error> {
     let algorithm = oqs::sig::Algorithm::Dilithium3;
     let sig = oqs::sig::Sig::new(algorithm).map_err(|_| Error::DilithiumSchemeCreation)?;
-    let (_, public_key) = sig.keypair().map_err(|_| Error::DilithiumKeyGeneration)?;
+    let (public_key, _) = sig.keypair().map_err(|_| Error::DilithiumKeyGeneration)?;
     let signature_obj = sig
         .signature_from_bytes(signature)
         .ok_or(Error::DilithiumVerification)?;
