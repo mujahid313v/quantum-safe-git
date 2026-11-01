@@ -1,0 +1,8 @@
+[package]
+name = "qsg-signing"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "qsg_signing"
+path = "src/lib.rs"

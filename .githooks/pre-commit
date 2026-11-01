@@ -1,0 +1,12 @@
+#!/bin/sh
+# QSGit pre-commit hook (dev tooling)
+# Basic checks before commit
+
+echo "QSGit pre-commit: running checks..."
+
+# Basic file checks
+if git diff --cached --name-only | grep -qE '\.md$'; then
+  echo "Markdown file staged - ensure formatting is clean"
+fi
+
+exit 0

@@ -268,6 +268,21 @@ graph LR
 | `CONTRIBUTING.md` | Code style, testing, pull‑request workflow |
 
 
+## 🌿 Git Branching Strategy & Branch Protection
+
+### Branch Strategy
+- **`main`** – Production-ready releases
+- **`develop`** – Pre-release integration branch
+- **`feature/<name>`** – Feature branches (e.g., `feature/phase1-ci-gitflow`)
+- **`release/<version>`** – Release preparation branches
+
+### Branch Protection Rules
+- Require PR reviews before merging to `main`/`develop`
+- Require status checks (CI) to pass
+- Require branches to be up to date before merging
+- Require PR template completion
+
+
 ## 📜 License
 
 This project is licensed under **Apache 2.0**. See `LICENSE` for details.

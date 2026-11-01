@@ -1,0 +1,13 @@
+tasks:
+  - name: Install dependencies
+    command: |
+      rustup component add rustfmt clippy 2>/dev/null || true
+      cargo --version || (curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y)
+      go version || (curl -sL https://go.dev/dl/go1.21.0.linux-amd64.tar.gz | tar -C /usr/local -xz)
+      node --version || (curl -sL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs)
+
+  - name: Start QSGit signature service
+    command: docker compose up -d signature-service
+
+  - name: Run verification
+    command: ./scripts/verify_repo.sh
