@@ -74,7 +74,7 @@ fn verify_dilithium3(payload: &[u8], signature: &[u8]) -> Result<bool, Error> {
         .signature_from_bytes(signature)
         .ok_or(Error::DilithiumVerification)?;
 
-    Ok(sig.verify(payload, &signature_obj, &public_key).is_ok())
+    Ok(sig.verify(payload, signature_obj, &public_key).is_ok())
 }
 
 pub mod keymgr;
