@@ -1,8 +1,6 @@
-*.pass
+target/
 keys/
 *.key
 *.enc
 *.pass
 .env
-target/
-EOF
