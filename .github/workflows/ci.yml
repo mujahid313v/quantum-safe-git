@@ -25,5 +25,9 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Fetch pinned NIST ACVP vectors
         run: python3 crates/qsg-core/tests/fetch_acvp_vectors.py
+      - name: OpenSSH version
+        run: ssh -V
       - name: Test
+        env:
+          QSG_REQUIRE_SSH_KEYGEN: "1"
         run: cargo test --workspace

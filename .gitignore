@@ -1,4 +1,5 @@
 target/
+crates/qsg-sshsig/fuzz/target/
 keys/
 *.key
 *.enc
