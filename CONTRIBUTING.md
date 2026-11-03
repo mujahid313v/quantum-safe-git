@@ -4,7 +4,7 @@ QSGit is experimental and moves in small milestones (see the roadmap in the READ
 
 ## Setup
 
-- Rust stable: `rustup component add clippy rustfmt`
+- Rust stable, MSRV 1.87: `rustup component add clippy rustfmt`
 - Git 2.34 or newer (SSH-format signing)
 - Target platforms for v0.1: Linux and macOS. Development on Windows is possible but not a target; WSL is recommended.
 - Extra tools depend on the crypto backend chosen in ADR 0001 (for liboqs: CMake and a C compiler).
