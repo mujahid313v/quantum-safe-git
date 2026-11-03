@@ -1,6 +1,6 @@
 # QSGit
 
-**Status: Experimental. No releases, no security audit. Not for production use.**
+**Status: Experimental. No releases or independent security audit of QSGit or its selected pure-Rust `ml-dsa` backend. Not for production use.**
 
 QSGit is an early-stage project that aims to sign and verify Git commits and tags with a post-quantum signature algorithm, ML-DSA-65 (FIPS 204), using Git's built-in SSH-signature interface. Verification is offline: no server and no network.
 
@@ -47,7 +47,7 @@ Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The list of what is out o
 | Milestone | Scope | Status |
 |-----------|-------|--------|
 | M0 | Repo cleanup and Git-interface spike | Windows spike done; cleanup in progress; Linux/macOS re-run pending |
-| M1 | ML-DSA-65 core (backend chosen by ADR) | Planned |
+| M1 | ML-DSA-65 core (backend chosen by ADR) | Implemented on `m1/core-mldsa`; review pending |
 | M2 | SSHSIG-style format and spec, test vectors | Planned |
 | M3 | Encrypted key storage | Planned |
 | M4 | allowed_signers parsing, validity, revocation | Planned |

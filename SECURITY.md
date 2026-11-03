@@ -1,6 +1,6 @@
 # Security Policy
 
-**QSGit is experimental. It has not been audited and must not be used to protect anything that matters.**
+**QSGit is experimental; neither QSGit nor its selected pure-Rust `ml-dsa` backend has been independently audited. Do not use it to protect anything that matters.**
 
 ## Supported versions
 

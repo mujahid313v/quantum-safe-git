@@ -4,7 +4,7 @@ QSGit is experimental and moves in small milestones (see the roadmap in the READ
 
 ## Setup
 
-- Rust stable: `rustup component add clippy rustfmt`
+- Rust stable, MSRV 1.87: `rustup component add clippy rustfmt`
 - Git 2.34 or newer (SSH-format signing)
 - Target platforms for v0.1: Linux and macOS. Development on Windows is possible but not a target; WSL is recommended.
 - Extra tools depend on the crypto backend chosen in ADR 0001 (for liboqs: CMake and a C compiler).
@@ -36,7 +36,7 @@ cargo test --workspace
 
 By contributing you agree that your contribution is licensed under Apache-2.0. The DCO sign-off certifies you have the right to submit it.
 Third-party licences are tracked in THIRD-PARTY.md (to be generated with cargo-about or cargo-deny; TODO).
-Licences of liboqs and the `oqs` crate: TODO: verify before adding them as dependencies.
+The M1 backend is RustCrypto `ml-dsa` (Apache-2.0 OR MIT); see [ADR 0001](docs/adr/0001-crypto-backend.md). The backend decision resolves the earlier liboqs/`oqs` licence TODO.
 
 ## Code of conduct
 

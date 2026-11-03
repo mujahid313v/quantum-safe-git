@@ -5,7 +5,7 @@
 | Threat | Notes | Planned response |
 |--------|-------|------------------|
 | Quantum attack on classical signatures | The reason for the project | ML-DSA-65 |
-| Implementation bugs in crypto code | liboqs is not audited or FIPS-validated | Reviewed library, known-answer tests, fuzzing |
+| Implementation bugs in crypto code | Neither the chosen pure-Rust `ml-dsa` crate nor liboqs is independently audited; liboqs is also not FIPS-validated | Reviewed library, known-answer tests, fuzzing |
 | Side channels | Depends on the backend | Prefer constant-time implementations; check backend claims |
 | Algorithm downgrade | Verifier accepting a weaker or unknown algorithm | Compile-time allowlist, hard failure on unknown types |
 | Stolen private key | From a laptop or backup | Encrypted key file; hardware keys are future work |

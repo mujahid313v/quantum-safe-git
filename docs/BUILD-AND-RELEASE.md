@@ -13,7 +13,7 @@ cargo test --workspace
 
 Targets for v0.1 are Linux and macOS. On Windows, WSL (Ubuntu) is recommended. Native Windows needs the Visual Studio C++ Build Tools for the Rust linker.
 
-Crypto-backend requirements are decided by ADR 0001. If liboqs is chosen it needs CMake and a C compiler.
+The M1 backend is the pure-Rust RustCrypto `ml-dsa` crate, pinned in `crates/qsg-core/Cargo.toml`; it requires Rust 1.87 or newer and needs no CMake, C compiler, or manual native-library installation. See [ADR 0001](adr/0001-crypto-backend.md). The workspace's stable toolchain in CI is sufficient.
 
 ## Checks
 

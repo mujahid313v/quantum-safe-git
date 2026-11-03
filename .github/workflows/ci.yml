@@ -23,5 +23,7 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Fetch pinned NIST ACVP vectors
+        run: python3 crates/qsg-core/tests/fetch_acvp_vectors.py
       - name: Test
         run: cargo test --workspace
