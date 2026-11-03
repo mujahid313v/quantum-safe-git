@@ -16,10 +16,10 @@
 | Revocation delay or coarse revocation | See trust model | Documented limitation |
 | Unsigned commits | Nothing forces signing | `qsg verify-range` plus branch protection |
 | Force-push or history rewrite | `verify-range` does not detect it | Branch protection and server-side rules |
-| Parser bugs | Container and `allowed_signers` parsers read untrusted input | Strict parsing, fuzzing |
+| Parser bugs | SSHSIG container parser reads untrusted input; `allowed_signers` parsing is future work | Strict parsing, fuzzing |
 | Supply chain | liboqs or crates compromised; tampered release binaries | Pinned versions, cargo-audit and cargo-deny, signed checksums |
 | Wrong identity | Principal not tied to commit author | Documented limitation |
 
 ## Mitigations currently implemented
 
-None.
+- `qsg-sshsig` rejects unsupported SSHSIG versions, namespaces, reserved/hash fields, key types, malformed lengths, trailing bytes, and oversized input. Property tests exercise arbitrary decoder input; a cargo-fuzz target is available, but no fuzz campaign has been run.
