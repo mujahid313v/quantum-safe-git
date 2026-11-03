@@ -1,0 +1,6 @@
+target/
+keys/
+*.key
+*.enc
+*.pass
+.env

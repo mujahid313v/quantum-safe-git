@@ -2,64 +2,26 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop, 'feature/**' ]
+    branches: [main]
   pull_request:
-    branches: [ main, develop ]
 
 jobs:
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
+  check:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-      - name: Setup Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-      - name: Rust formatting check
-        run: cargo fmt --check
-        working-directory: rust
-      - name: Rust clippy
-        run: cargo clippy -- -D warnings
-        working-directory: rust
-      - name: Install cargo-audit
-        run: cargo install --locked cargo-audit
-      - name: Run cargo audit
-        run: cargo audit
-        working-directory: rust
-      - name: Go formatting check
-        run: gofmt -l .
-        working-directory: go
-      - name: Go vet
-        run: go vet ./...
-        working-directory: go
-
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-      - name: Setup Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-      - name: Rust tests
-        run: cargo test
-        working-directory: rust
-      - name: Go tests
-        run: go test ./...
-        working-directory: go
-
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build signature service image
-        run: docker build -f docker/Dockerfile.signature -t qsg-signature-service .
+      - name: Toolchain
+        run: |
+          rustup update stable
+          rustup default stable
+          rustup component add clippy rustfmt
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Test
+        run: cargo test --workspace

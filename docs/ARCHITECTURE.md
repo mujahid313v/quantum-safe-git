@@ -1,182 +1,64 @@
-# Quantum-Safe Git (QSGit) – System Architecture
+# Architecture
 
-## Overview
+**Status: design document. Experimental. No audit. Not for production use.** Almost nothing described here is implemented.
 
-QSGit implements a **modular, cloud-native** architecture that combines low-level Git hooks with a high-performance signature service, a rich UI, and enterprise-grade security layers.
+## Idea
 
-### Core Components
+Git can delegate commit and tag signing to an external program (`gpg.format ssh` plus `gpg.ssh.program`). QSGit supplies such a program. It produces and checks ML-DSA-65 signatures wrapped in an SSH-signature-style container. Git does not inspect the signature blob; it trusts the program's output (see [GIT-INTERFACE.md](GIT-INTERFACE.md)).
 
-| Component | Technology | Responsibilities |
-|-----------|------------|------------------|
-| **Git Hooks Plugin** | Rust (libgit2) | Intercepts `commit`, `push`, `tag` events; auto-signs with PQC. |
-| **Signature Service** | Go + gRPC | Manages key storage, signs/verifies, provides API endpoints. |
-| **Key Repository** | HSM / Cloud KMS | Stores signing keys securely (YubiKey, AWS KMS, Azure Key Vault, TPM). |
-| **Central Audit Log** | Elasticsearch + Kafka | Immutable logs of all signing events. |
-| **Policy Engine** | Go (OPA) | Enforces organization-wide signing policies. |
-| **Desktop UI** | Electron + React | Visual verification, key management, status dashboard. |
-| **IDE Extensions** | Language Server Protocol | Real-time signature status in VS Code, IntelliJ, etc. |
-| **CLI Tools** | Rust / Go | Command-line utilities for verification, key generation, migration. |
-| **CI/CD Integration** | GitHub Actions, GitLab CI, Jenkins | Automated verification in pipelines. |
-| **Monitoring** | Prometheus + Grafana | Real-time metrics, alerts, dashboards. |
+## Components
 
-### Data Flow
+| Component | Role |
+|-----------|------|
+| `qsg-core` | ML-DSA-65 key generation, sign, verify. No file or network I/O. |
+| `qsg-sshsig` | Encode and decode the signature container ([SPEC.md](SPEC.md)). |
+| `qsg-keystore` | Key generation and encrypted private-key storage under `~/.config/qsgit/`. |
+| `qsg-trust` | Parse `allowed_signers`, validity windows, revocation list. |
+| `qsg-cli` (binary `qsg`) | User commands. |
+| `qsg-ssh-keygen` | Implements only the `-Y` calls Git makes. Links `qsg-core` directly; it does not run `qsg`. |
 
-1. **Local Signing**  
-   - Git hook → Signature Service (gRPC) → Key Repository → PQC signature embedded in commit.
+Crypto backend: TBD (ADR 0001): either the `oqs` crate on liboqs, or a pure-Rust ML-DSA implementation.
 
-2. **Verification**  
-   - CI or local tool → Signature Service → Public key lookup → Signature validation → Audit log.
+## Flows
 
-3. **Audit & Monitoring**  
-   - Every signing/verification event is written to Elasticsearch.  
-   - Prometheus scrapes metrics (signing rate, latency, errors) → Grafana visualizes.
+Signing (calls verified by the M0 spike):
 
-### Interaction Diagrams
+1. `git commit -S` writes the commit text (without signature) to a temp file.
+2. Git runs `qsg-ssh-keygen -Y sign -n git -f <user.signingkey value> <temp file>`.
+3. The program signs, writes `<temp file>.sig`, and exits 0.
+4. Git stores the armored signature in the commit's `gpgsig` header.
 
-#### Commit Signing Flow
+Verification:
 
-```mermaid
-graph TD
-    U[Developer] --> GH[Git Hook]
-    GH --> SS[Signature Service]
-    SS --> KR[Key Repository]
-    KR --> GH
-    GH --> C[Commit with Embedded Signature]
-```
+1. Git runs `-Y find-principals -f <allowed_signers> -s <sig file> -Overify-time=...`; the program prints the matching principal.
+2. Git runs `-Y verify -n git -f <allowed_signers> -I <principal> -s <sig file> -Overify-time=...` with the signed text on stdin.
+3. The program checks the signature and prints `Good "git" signature for <principal> with <KEYTYPE> key <fingerprint>`, exit 0. On failure it exits non-zero.
 
-#### Verification Flow
+The same flows serve tags. Nothing needs a network or a service.
 
-```mermaid
-graph TD
-    CI[CI System] --> SS[Signature Service]
-    SS --> KR[Key Repository]
-    KR --> SS
-    SS --> AL[Audit Log]
-    CI --> R[Verification Result]
-```
+`qsg verify-range <base>..<head> --allowed-signers <file>` (planned) checks many commits for CI use.
 
-### Deployment Architecture
+## Planned or out of scope for v0.1
 
-- **Local Developer Environment** – Git hooks, Desktop UI, CLI tools.
-- **Enterprise Cluster** – Signature Service + Key Repository (Kubernetes Deployments, StatefulSets).
-- **Observability Stack** – Prometheus (metrics), Grafana (dashboards), Elasticsearch (logs), Alertmanager (alerts).
+This is the single list; other documents link here.
 
-### High Availability & Scaling
+- gRPC or other signing service
+- Desktop UI, IDE extensions
+- Docker, Kubernetes, Helm
+- Metrics and dashboards, centralised audit logging
+- HSM, YubiKey, TPM, cloud KMS keys
+- Hybrid signatures (Ed25519 + ML-DSA)
+- Falcon / FN-DSA (TODO: verify NIST status)
+- A reusable GitHub Action
+- Transparency log or trusted timestamping
+- ssh-agent support (`user.signingkey = key::...` makes Git pass `-U`)
 
-- **Signature Service** can be horizontally scaled via Kubernetes Deployments; load balancing is handled by Ingress controllers.
-- **Key Repository** uses a combination of replicated HSMs (for on-prem) or cloud KMS (for SaaS) with automatic fail-over.
-- **Audit Logging** employs a distributed Kafka → Elasticsearch pipeline for write-once, read-anywhere semantics.
+Not goals at all: blockchain, machine-learning anomaly detection, mobile app, marketplace.
 
-### Security Considerations
+## Platforms
 
-- **TLS everywhere** – Mutual TLS (mTLS) between components.
-- **Principle of Least Privilege** – Git hooks run with minimal permissions; Signature Service only accesses required key material.
-- **Key Rotation** – Automated policies can enforce periodic key rotation via HSM or cloud KMS APIs.
-- **Immutable Audit Trail** – Logs are written to Write-Once storage (e.g., AWS S3 Object Lock) to prevent tampering.
+v0.1 targets Linux and macOS with Git 2.34 or newer. The spike ran on Windows only so far.
 
-### API Contract
+## SHA-256 repositories
 
-The **Signature Service** exposes a gRPC API defined in `proto/qsg.proto`:
-
-```protobuf
-syntax = "proto3";
-
-service QsgService {
-  rpc SignObject (SignRequest) returns (SignResponse);
-  rpc VerifyObject (VerifyRequest) returns (VerifyResponse);
-  rpc GetPublicKey (PublicKeyRequest) returns (PublicKeyResponse);
-}
-
-message SignRequest {
-  bytes payload = 1;
-  string author = 2;
-  int64 timestamp = 3;
-}
-
-message SignResponse {
-  bytes signature = 1;
-  string algorithm = 2;
-  int64 signed_at = 3;
-}
-
-message VerifyRequest {
-  bytes payload = 1;
-  bytes signature = 2;
-  string key_id = 3;
-}
-
-message VerifyResponse {
-  bool valid = 1;
-  string error_message = 2;
-  // Optional: details like signer identity, timestamp
-}
-
-message PublicKeyRequest {
-  string key_id = 1;
-}
-
-message PublicKeyResponse {
-  string public_key = 1;
-  string algorithm = 2;
-  string created_at = 3;
-}
-```
-
-Clients (Git hooks, CLI, UI) generate a gRPC channel, authenticate via TLS client certificates, and call these endpoints.
-
-### Operational Procedures
-
-#### Key Management
-- **Generating a New Key**: `qsg-genkey --algorithm dilithium3 --output ./keys/user1`
-- **Rotating a Key**: `qsg-genkey --rotate --key-id user1 --output ./keys/user1_new`
-- **Importing from Hardware**: `qsg-import --source yubikey:// --key-id hardware1`
-
-#### Running Locally
-```bash
-# Start signature service (in one terminal)
-docker compose up -d signature-service
-
-# Add git hook plugin (copy binary to ~/.git_ext)
-cp target/debug/git_hook ~/.git_ext/
-
-# Launch desktop UI
-npm run start --prefix ui/
-```
-
-#### Running in Production (Kubernetes)
-```bash
-# Deploy via Helm
-helm install qsg ./helm/qsg \
-  --set image=yourrepo/qsg-signature:latest \
-  --set keyRepository.type=cloud \
-  --set keyRepository.cloud.provider=aws
-
-# Verify signing works
-git commit -m "test" && git verify-signature
-```
-
-### Monitoring & Alerting
-
-| Metric | Description |
-|--------|-------------|
-| `signing_requests_total` | Total number of signing requests processed |
-| `verification_requests_total` | Total verification attempts |
-| `signing_latency_seconds` | Histogram of signing latency |
-| `verification_latency_seconds` | Histogram of verification latency |
-| `key_rotation_events_total` | Count of automatic key rotations |
-| `audit_log_entries_total` | Number of logged events |
-
-Alerts are defined in `prometheus/alerts.yml`:
-
-```yaml
-groups:
-- name: qsg_alerts
-  rules:
-  - alert: HighSigningLatency
-    expr: histogram_quantile(0.95, qsg_signing_latency_seconds) > 0.5
-    for: 5m
-    labels:
-      severity: warning
-    annotations:
-      summary: "High signing latency detected"
-      description: "Average signing latency is {{ $value }} seconds"
+QSGit signs the buffer Git hands over, so it does not depend on the object hash. The spike saw identical calls for sha1 and sha256 repositories. An end-to-end test with a sha256 repository is part of v0.1 (M6).
