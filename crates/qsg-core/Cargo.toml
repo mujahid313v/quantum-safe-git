@@ -2,9 +2,11 @@
 name = "qsg-core"
 version = "0.1.0"
 edition = "2024"
+rust-version.workspace = true
 
 [dependencies]
 ml-dsa = { version = "=0.1.2", features = ["zeroize"] }
+getrandom = { version = "=0.4.3", features = ["sys_rng"] }
 thiserror = "=2.0.18"
 zeroize = "=1.8.2"
 

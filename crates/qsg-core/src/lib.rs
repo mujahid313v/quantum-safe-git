@@ -2,6 +2,7 @@
 
 //! ML-DSA-65 core operations. This crate performs no file or network I/O.
 
+use getrandom::SysRng;
 use ml_dsa::{
     EncodedSignature, EncodedVerifyingKey, ExpandedSigningKey, ExpandedSigningKeyBytes, Generate,
     Keypair, MlDsa65, Signature as MlSignature, SigningKey, VerifyingKey,
@@ -24,6 +25,8 @@ pub enum Error {
     },
     #[error("context exceeds the ML-DSA limit of 255 bytes")]
     ContextTooLong,
+    #[error("operating-system randomness unavailable")]
+    RandomnessUnavailable,
     #[error("ML-DSA signing failed")]
     SigningFailed,
     #[error("invalid signature encoding")]
@@ -102,7 +105,8 @@ impl Signature {
 }
 
 pub fn keygen() -> Result<(PublicKey, SecretKey)> {
-    let signing_key = SigningKey::<MlDsa65>::generate();
+    let signing_key = SigningKey::<MlDsa65>::try_generate_from_rng(&mut SysRng)
+        .map_err(|_| Error::RandomnessUnavailable)?;
     let public = signing_key.verifying_key().encode();
     // M1 fixes the exposed secret encoding at the 4032-byte expanded form. The
     // backend marks this internal encoding deprecated in favor of its 32-byte seed.
@@ -119,7 +123,7 @@ pub fn sign(secret: &SecretKey, message: &[u8], context: &[u8]) -> Result<Signat
     // The public API requires the FIPS expanded private-key encoding (4032 bytes).
     let key = ExpandedSigningKey::<MlDsa65>::from_expanded(&secret.0);
     let signature = key
-        .sign_deterministic(message, context)
+        .sign_randomized(message, context, &mut SysRng)
         .map_err(|_| Error::SigningFailed)?;
     Ok(Signature(signature.encode()))
 }
@@ -206,11 +210,13 @@ mod tests {
     }
 
     #[test]
-    fn fallback_deterministic_signing_check() {
-        let (_, sk) = keygen().unwrap();
-        let first = sign(&sk, b"fixed test message", b"test context").unwrap();
-        let second = sign(&sk, b"fixed test message", b"test context").unwrap();
-        assert_eq!(first.as_bytes(), second.as_bytes());
+    fn production_signing_is_hedged() {
+        let (pk, sk) = keygen().unwrap();
+        let first = sign(&sk, b"same message", b"test context").unwrap();
+        let second = sign(&sk, b"same message", b"test context").unwrap();
+        assert_ne!(first.as_bytes(), second.as_bytes());
+        verify(&pk, b"same message", &first, b"test context").unwrap();
+        verify(&pk, b"same message", &second, b"test context").unwrap();
     }
 
     proptest! {
