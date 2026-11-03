@@ -1,6 +1,6 @@
 # Signature format v1 (draft)
 
-**Status: M2 implemented. Experimental. No independent audit.** Ed25519 container interoperability passed in both directions with OpenSSH_for_Windows 9.5p2. Linux/macOS CI results are recorded after the M2 pull request checks complete.
+**Status: M2 implemented. Experimental. No independent audit.** Ed25519 container interoperability passed in both directions with OpenSSH_for_Windows 9.5p2. Ubuntu and macOS CI interoperability passed (OpenSSH_9.6p1 Ubuntu-3ubuntu13.20 and OpenSSH_10.3p1, respectively).
 
 ## Container
 
@@ -77,4 +77,4 @@ The fixed ML-DSA-65 SSHSIG vectors are in `crates/qsg-sshsig/tests/vectors/`:
 
 The ignored test `regenerate_hedged_ml_dsa65_vectors` creates a fresh keypair with `qsg-core::keygen`, signs twice through `qsg-sshsig::sign_ml_dsa65` (hedged OS randomness), writes only public SSHSIG blobs, and derives each invalid vector by flipping one bit in its signature. Regeneration intentionally produces different valid bytes; the committed files are the fixed vectors used by tests.
 
-Ed25519 interop was tested on Windows with OpenSSH_for_Windows 9.5p2. CI sets `QSG_REQUIRE_SSH_KEYGEN=1` and runs the same tests on Ubuntu and macOS; CI tool versions/results: TODO: verify after the PR checks run.
+Ed25519 interop was tested on Windows with OpenSSH_for_Windows 9.5p2. CI sets `QSG_REQUIRE_SSH_KEYGEN=1`; both platform jobs passed. OpenSSH versions: Windows OpenSSH_for_Windows 9.5p2 (LibreSSL 3.8.2), Ubuntu OpenSSH_9.6p1 Ubuntu-3ubuntu13.20 (OpenSSL 3.0.13), and macOS OpenSSH_10.3p1 (LibreSSL 3.3.6). The Ubuntu and macOS versions come from the M2 CI workflow logs.
