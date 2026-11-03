@@ -47,7 +47,7 @@ Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The list of what is out o
 | Milestone | Scope | Status |
 |-----------|-------|--------|
 | M0 | Repo cleanup and Git-interface spike | Windows spike done; cleanup in progress; Linux/macOS re-run pending |
-| M1 | ML-DSA-65 core (backend chosen by ADR) | Planned |
+| M1 | ML-DSA-65 core (backend chosen by ADR) | Implemented on `m1/core-mldsa`; review pending |
 | M2 | SSHSIG-style format and spec, test vectors | Planned |
 | M3 | Encrypted key storage | Planned |
 | M4 | allowed_signers parsing, validity, revocation | Planned |
