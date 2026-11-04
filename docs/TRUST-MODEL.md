@@ -27,7 +27,7 @@ The parser accepts LF and CRLF, skips blank lines and lines beginning with `#`, 
 
 ## Validity windows and time
 
-Git passes `-Overify-time=YYYYMMDDHHMMSS` derived from the commit's timestamp. The M4 logging-wrapper experiment verified that Git formats this value in the machine's local time, independently of the commit's recorded UTC offset, and does not append `Z`. Windows was tested locally; Linux and macOS verification is configured in M4 CI and will be recorded after it completes. The timestamp is still chosen by the commit author: a stolen key can backdate signed commits into a validity window. Validity windows limit honest mistakes, not a determined attacker with the key.
+Git passes `-Overify-time=YYYYMMDDHHMMSS` derived from the commit's timestamp. The M4 logging-wrapper experiment verified that Git formats this value in the machine's local time, independently of the commit's recorded UTC offset, and does not append `Z`. This was tested locally on Windows with Git 2.55.0.windows.5 and in CI on Linux and macOS with Git 2.56.0; on both Unix systems it was tested under UTC, Asia/Kolkata, and America/Los_Angeles. The timestamp is still chosen by the commit author: a stolen key can backdate signed commits into a validity window. Validity windows limit honest mistakes, not a determined attacker with the key.
 
 ## Rotation
 
@@ -38,8 +38,6 @@ Git passes `-Overify-time=YYYYMMDDHHMMSS` derived from the commit's timestamp. T
 ## Revocation (v0.1 limits)
 
 A revocation file contains one canonical `SHA256:<unpadded-base64>` fingerprint per line; blank lines and `#` comments are ignored. A malformed fingerprint fails parsing. A revoked key fails for all its signatures, including legitimate old ones, because the list has no effective date. "Revocation with effective date" is an open decision. Revocation also takes effect only where verifiers have the updated list.
-
-The M4 revocation file contains one canonical `SHA256:<unpadded-base64>` fingerprint per line; blank lines and `#` comments are ignored. Malformed fingerprints fail parsing.
 
 ## Identity binding
 
