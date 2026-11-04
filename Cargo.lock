@@ -294,6 +294,7 @@ dependencies = [
  "getrandom 0.4.3",
  "ml-dsa",
  "proptest",
+ "rand",
  "thiserror",
  "zeroize",
 ]
