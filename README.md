@@ -49,7 +49,7 @@ Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The list of what is out o
 | M0 | Repo cleanup and Git-interface spike | Windows spike done; cleanup in progress; Linux/macOS re-run pending |
 | M1 | ML-DSA-65 core (backend chosen by ADR) | Implemented on `m1/core-mldsa`; review pending |
 | M2 | SSHSIG-style format and spec, test vectors | Implemented on `m2/sshsig`; OpenSSH interoperability verified on Windows, Ubuntu, and macOS CI |
-| M3 | Encrypted key storage | Planned |
+| M3 | Encrypted key storage | Implemented on `m3/keystore`; review pending |
 | M4 | allowed_signers parsing, validity, revocation | Planned |
 | M5 | `qsg-ssh-keygen` and `qsg` CLI | Planned |
 | M6 | End-to-end tests and CI | Planned |
