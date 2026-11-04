@@ -132,6 +132,23 @@ pub fn sign_ml_dsa65(
     })
 }
 
+/// Encode an ML-DSA-65 public key as the SSH public-key blob used by QSGit.
+pub fn encode_ml_dsa65_public_key_blob(public_key: &PublicKey) -> Result<Vec<u8>> {
+    encode_key_blob(ML_DSA_65_KEY_TYPE, public_key.as_bytes())
+}
+
+/// Decode and validate a QSGit ML-DSA-65 public-key blob.
+pub fn decode_ml_dsa65_public_key_blob(blob: &[u8]) -> Result<PublicKey> {
+    let (key_type, key_bytes) = parse_inner_blob(blob)?;
+    if key_type != ML_DSA_65_KEY_TYPE.as_bytes() {
+        return Err(Error::UnknownKeyType);
+    }
+    if key_bytes.len() != qsg_core::PUBLIC_KEY_SIZE {
+        return Err(Error::InvalidMlDsaPublicKeyLength);
+    }
+    PublicKey::from_bytes(key_bytes).map_err(Error::from)
+}
+
 /// Verify an ML-DSA-65 SSHSIG record with the fixed QSGit-v1 context.
 pub fn verify_ml_dsa65(record: &SshSignature, message: &[u8]) -> Result<()> {
     validate_header(
