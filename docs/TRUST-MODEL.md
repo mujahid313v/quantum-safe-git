@@ -9,10 +9,16 @@ Only public keys listed in the verifier's `allowed_signers` file. A valid signat
 Format (OpenSSH-compatible, custom key type):
 
 ```
-<principal> namespaces="git" [valid-after=<date>] [valid-before=<date>] ssh-mldsa65@qsgit <base64 public key blob>
+<principals> <options> ssh-mldsa65@qsgit <base64 public key blob> [comment]
 ```
 
-Date syntax: follow ssh-keygen(1), section ALLOWED SIGNERS (TODO: verify exact format).
+`valid-after` and `valid-before` accept `YYYYMMDD[Z]` or `YYYYMMDDHHMM[SS][Z]`, verified against ssh-keygen(1) and real OpenSSH. A missing `Z` means local civil time; `Z` means UTC. QSGit compares times naively when both use the same basis. If an allowed-signer time and verify time have different bases, callers must provide the explicit local UTC offset; otherwise checking returns an error. No local-time database is used.
+
+Both boundaries are inclusive: a key is valid at exactly `valid-after` and exactly `valid-before`. This matches ssh-keygen(1) and real OpenSSH tests.
+
+Unlike OpenSSH, QSGit requires an explicit `namespaces` option containing `git`; OpenSSH treats a missing namespace option as any namespace. Namespace values are matched exactly. Principals are exact-match only; wildcard and negation characters are rejected. Other key types are skipped and returned in the parser's `skipped` list; malformed QSGit key-type lines fail with a line-numbered error.
+
+The parser accepts LF and CRLF, skips blank lines and lines beginning with `#`, and supports only `namespaces`, `valid-after`, and `valid-before`. `cert-authority` and unknown options are errors. Limits are 1 MiB per file, 16 KiB per line, and 10,000 non-comment entries.
 
 ## Where the file must come from
 
@@ -21,9 +27,7 @@ Date syntax: follow ssh-keygen(1), section ALLOWED SIGNERS (TODO: verify exact f
 
 ## Validity windows and time
 
-Git passes `-Overify-time=YYYYMMDDHHMMSS` derived from the commit's own timestamp (observed in the spike). That time is chosen by the signer. A stolen key can therefore sign commits with any date, including dates inside a validity window. Validity windows limit honest mistakes, not a determined attacker with the key.
-
-UNVERIFIED: which time zone Git uses for that value (in the spike both the machine and the commit were +0530). Test across time zones in M5.
+Git passes `-Overify-time=YYYYMMDDHHMMSS` derived from the commit's timestamp. The M4 logging-wrapper experiment verified that Git formats this value in the machine's local time, independently of the commit's recorded UTC offset, and does not append `Z`. This was tested locally on Windows with Git 2.55.0.windows.5 and in CI on Linux and macOS with Git 2.56.0; on both Unix systems it was tested under UTC, Asia/Kolkata, and America/Los_Angeles. The timestamp is still chosen by the commit author: a stolen key can backdate signed commits into a validity window. Validity windows limit honest mistakes, not a determined attacker with the key.
 
 ## Rotation
 
@@ -33,7 +37,7 @@ UNVERIFIED: which time zone Git uses for that value (in the spike both the machi
 
 ## Revocation (v0.1 limits)
 
-A revocation list names key fingerprints. A revoked key fails for all its signatures, including legitimate old ones, because the list has no effective date. "Revocation with effective date" is an open decision. Revocation also takes effect only where verifiers have the updated list.
+A revocation file contains one canonical `SHA256:<unpadded-base64>` fingerprint per line; blank lines and `#` comments are ignored. A malformed fingerprint fails parsing. A revoked key fails for all its signatures, including legitimate old ones, because the list has no effective date. "Revocation with effective date" is an open decision. Revocation also takes effect only where verifiers have the updated list.
 
 ## Identity binding
 

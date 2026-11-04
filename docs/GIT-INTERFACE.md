@@ -5,7 +5,7 @@
 ## Test environment
 - Windows, Git 2.55.0.windows.5, OpenSSH 10.5p1 (Git Bash).
 
-- Linux and macOS: UNVERIFIED. Re-run the spike there before relying on this file.
+- The M0 call-shape spike above was run on Windows. Its Linux/macOS call-shape behavior remains UNVERIFIED.
 - Method: (1) a logging wrapper around the real `ssh-keygen`, (2) a fake program returning a dummy armored blob, both set as `gpg.ssh.program`.
 
 - Object formats tested with the real `ssh-keygen`: sha1 and sha256. The calls were identical.
@@ -38,14 +38,23 @@ git config gpg.ssh.allowedSignersFile <file>
 
 - Git did not validate the blob: a dummy blob and a non-standard key type name in the "Good" line were accepted.
 
+## Git verification timestamp experiment (M4)
+
+`tools/spike/verify_time.py` creates and verifies signed commits using a logging `gpg.ssh.program` wrapper. It varies the author and committer offsets independently among `+0000`, `+0530`, and `-0800`, and on Unix varies machine `TZ` among UTC, Asia/Kolkata, and America/Los_Angeles.
+
+- Windows 11, Git 2.55.0.windows.5: VERIFIED locally. All three commit offsets produced `20250101053000` in both verification calls on the local +05:30 machine zone; Git appended no `Z`.
+- Linux, Git 2.56.0, x86_64, OpenSSH_9.6p1 Ubuntu-3ubuntu13.20: VERIFIED in M4 CI. For each of the three author/committer offset pairs, UTC produced `20250101000000`, Asia/Kolkata produced `20250101053000`, and America/Los_Angeles produced `20241231160000` in both verification calls.
+- macOS 26, Git 2.56.0, arm64, OpenSSH_10.3p1: VERIFIED in M4 CI. The same three machine-zone values were observed for all author/committer offset pairs.
+
+Observed behavior: Git formats the commit's epoch timestamp in the machine's local time, independently of the commit's recorded UTC offset, and does not append `Z`. On Linux and macOS, both `find-principals` and `verify` produced the same value. This is verified only for the Git versions and systems listed above.
+
 ## Not verified
-- Time zone of `verify-time` (UTC, local time, or the commit's offset). Both were +0530 in the test.
 
 - Whether Git requires the `-----BEGIN SSH SIGNATURE-----` prefix.
 - Whether stderr output from the program matters.
 
 - Whether `check-novalidate` or `-r` (revocation file) is ever used.
-- Behaviour on Linux, macOS, and other Git versions.
+- M0 Git call shapes on Linux/macOS, and behavior on Git versions other than those listed above.
 
 ## Consequences for QSGit
 - `qsg-ssh-keygen` implements only `sign`, `find-principals` and `verify`; any other `-Y` subcommand exits non-zero with a clear message.
@@ -53,4 +62,4 @@ git config gpg.ssh.allowedSignersFile <file>
 - `user.signingkey` points to a QSGit key file path. The `key::` form (needs ssh-agent) is rejected with an explanatory error in v0.1.
 - The shim must print exactly the `Good "git" signature for ...` line on success.
 
-- `verify-time` parsing must be tested across time zones (M5).
+- M4 trust parsing treats Git's no-`Z` verify time as local civil time. When comparing it to a UTC validity date, callers must supply an explicit UTC offset.
