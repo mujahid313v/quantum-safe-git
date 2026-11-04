@@ -137,10 +137,10 @@ pub fn generate(
     ensure_private_dir(dir)?;
     let private_path = dir.join(name);
     let public_path = PathBuf::from(format!("{}.pub", private_path.display()));
+    refuse_symlink(&private_path)?;
     if !overwrite && (private_path.exists() || public_path.exists()) {
         return Err(Error::AlreadyExists);
     }
-    refuse_symlink(&private_path)?;
     let (public, _expanded, seed) = qsg_core::keygen_with_seed()?;
     let blob = qsg_sshsig::encode_ml_dsa65_public_key_blob(&public)?;
     let private = encode_container(seed.as_bytes(), passphrase, None)?;
