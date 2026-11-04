@@ -73,7 +73,8 @@ def main():
         root = Path(temp)
         wrapper = make_wrappers(root)
         for offset, zone in scenarios():
-            repo = root / f"repo-{offset.replace('+', 'p').replace('-', 'm')}-{zone or 'local'}"
+            safe_zone = (zone or "local").replace("/", "_")
+            repo = root / f"repo-{offset.replace('+', 'p').replace('-', 'm')}-{safe_zone}"
             repo.mkdir()
             run(["git", "init", "-q", str(repo)])
             run(["git", "config", "user.name", "M4 time test"], cwd=repo)
