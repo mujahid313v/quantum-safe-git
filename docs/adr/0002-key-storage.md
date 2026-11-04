@@ -16,6 +16,8 @@ Unix directories use mode 0700 and private files mode 0600; unsafe existing perm
 
 Passphrase, seed, derived key, and decrypted buffers are zeroized. The CLI will collect passphrases in M5; M3 accepts them only as library parameters. Passphrase-less creation is an explicit option.
 
+Argon2id internal working memory is not wiped when freed (argon2 0.6.0, verified by source inspection). Passphrase, seed, derived key and decrypted buffers are zeroized. Memory disclosure (core dumps, swap, cold boot) may expose key-derivation intermediates. Not audited.
+
 ## Consequences
 
 - The file format is versioned and rejects unknown algorithms, KDFs, AEADs, malformed sizes, and excessive KDF work.

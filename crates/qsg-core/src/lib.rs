@@ -8,7 +8,7 @@ use ml_dsa::{
     Keypair, MlDsa65, Seed as MlDsaSeed, Signature as MlSignature, SigningKey, VerifyingKey,
 };
 use thiserror::Error;
-use zeroize::{Zeroize, Zeroizing};
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 pub const PUBLIC_KEY_SIZE: usize = 1952;
 pub const SECRET_KEY_SIZE: usize = 4032;
@@ -81,26 +81,28 @@ impl SecretKey {
 }
 
 /// Zeroizing 32-byte ML-DSA seed, suitable for encrypted storage.
+#[derive(Zeroize, ZeroizeOnDrop)]
 pub struct Seed([u8; SEED_SIZE]);
+
+fn assert_zeroize_on_drop<T: ZeroizeOnDrop>() {}
+const _: fn() = assert_zeroize_on_drop::<Seed>;
 
 impl Seed {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        let value: [u8; SEED_SIZE] = bytes.try_into().map_err(|_| Error::InvalidLength {
-            kind: "seed",
-            expected: SEED_SIZE,
-            actual: bytes.len(),
-        })?;
-        Ok(Self(value))
+        if bytes.len() != SEED_SIZE {
+            return Err(Error::InvalidLength {
+                kind: "seed",
+                expected: SEED_SIZE,
+                actual: bytes.len(),
+            });
+        }
+        let mut value = Zeroizing::new([0; SEED_SIZE]);
+        value.copy_from_slice(bytes);
+        Ok(Self(core::mem::take(&mut *value)))
     }
 
     pub fn as_bytes(&self) -> &[u8; SEED_SIZE] {
         &self.0
-    }
-}
-
-impl Drop for Seed {
-    fn drop(&mut self) {
-        self.0.zeroize();
     }
 }
 
@@ -148,9 +150,9 @@ pub fn keygen_with_seed() -> Result<(PublicKey, SecretKey, Seed)> {
     #[allow(deprecated)]
     let secret = SecretKey(signing_key.expanded_key().to_expanded());
     let backend_seed = Zeroizing::new(signing_key.to_seed());
-    let mut seed = [0; SEED_SIZE];
+    let mut seed = Zeroizing::new([0; SEED_SIZE]);
     seed.copy_from_slice(backend_seed.as_slice());
-    Ok((public, secret, Seed(seed)))
+    Ok((public, secret, Seed(core::mem::take(&mut *seed))))
 }
 
 /// Reconstruct the ML-DSA keypair from its 32-byte seed.

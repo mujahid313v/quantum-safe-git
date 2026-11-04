@@ -256,23 +256,23 @@ fn private_path_symlink_is_refused() {
 #[test]
 #[ignore = "run once when regenerating the deterministic cheap-Argon2 test vector"]
 fn write_test_vector() {
-    let mut seed = [0x42u8; SEED_LEN];
+    let seed = Zeroizing::new([0x42u8; SEED_LEN]);
     let passphrase = Passphrase::new(VECTOR_PASSPHRASE).unwrap();
-    let mut encoded = encode_container(&seed, Some(&passphrase), Some((8, 1, 1))).unwrap();
+    let mut encoded = encode_container(&seed[..], Some(&passphrase), Some((8, 1, 1))).unwrap();
     // Stable nonces and salt are used only for the published, non-secret test fixture.
     encoded[18..34].copy_from_slice(&[0x11; SALT_LEN]);
     encoded[35..59].copy_from_slice(&[0x22; NONCE_LEN]);
     // Re-encode with the fixed salt and nonce after constructing its associated-data header.
     let mut header = encoded[..HEADER_LEN].to_vec();
     let key = derive_key(Some(&passphrase), KDF_ARGON2ID, 8, 1, 1, &header[18..34]).unwrap();
-    let cipher_key = Key::try_from(&key[..]).unwrap();
+    let cipher_key = Zeroizing::new(Key::try_from(&key[..]).unwrap());
     let cipher = XChaCha20Poly1305::new(&cipher_key);
     let nonce = XNonce::try_from(&header[35..59]).unwrap();
     let encrypted = cipher
         .encrypt(
             &nonce,
             Payload {
-                msg: &seed,
+                msg: &seed[..],
                 aad: &header,
             },
         )
@@ -280,5 +280,4 @@ fn write_test_vector() {
     header.extend_from_slice(&encrypted);
     fs::create_dir_all(vector_path().parent().unwrap()).unwrap();
     fs::write(vector_path(), header).unwrap();
-    seed.zeroize();
 }

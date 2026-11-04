@@ -42,3 +42,5 @@ The blob uses the encoding from [docs/SPEC.md](SPEC.md): `string("ssh-mldsa65@qs
 On Unix, the key directory must be exactly mode 0700 and private files exactly 0600. The library rejects looser permissions and reports the `chmod` command to correct them. Temporary files are created in the same directory with `create_new`, written and synced before atomic publication; an existing key is not replaced unless the caller explicitly requests overwrite. Unix reads use no-follow open semantics and reject private-key symlinks. On Windows, directory selection is best effort and these Unix permission guarantees are unavailable; the implementation checks for a symlink before opening but cannot provide Unix mode protections.
 
 The default location is `$XDG_CONFIG_HOME/qsgit` when set on Unix, otherwise `~/.config/qsgit`. On Windows it is `%APPDATA%\qsgit`, with `%USERPROFILE%\AppData\Roaming\qsgit` as a fallback.
+
+Windows: private-key file permissions are not enforced in v0.1.

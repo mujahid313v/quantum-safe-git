@@ -356,7 +356,7 @@ fn encode_container(
     header.push(AEAD_XCHACHA20_POLY1305);
     header.extend_from_slice(&nonce);
     let key = derive_key(passphrase, kdf, memory, iterations, lanes, &salt)?;
-    let cipher_key = Key::try_from(&key[..]).map_err(|_| Error::Crypto)?;
+    let cipher_key = Zeroizing::new(Key::try_from(&key[..]).map_err(|_| Error::Crypto)?);
     let cipher = XChaCha20Poly1305::new(&cipher_key);
     let cipher_nonce = XNonce::try_from(&nonce[..]).map_err(|_| Error::Crypto)?;
     let encrypted = cipher
@@ -424,7 +424,7 @@ fn decode_container(
         KeyKind::Unencrypted
     };
     let key = derive_key(passphrase, kdf, memory, iterations, lanes, salt)?;
-    let cipher_key = Key::try_from(&key[..]).map_err(|_| Error::Crypto)?;
+    let cipher_key = Zeroizing::new(Key::try_from(&key[..]).map_err(|_| Error::Crypto)?);
     let cipher = XChaCha20Poly1305::new(&cipher_key);
     let cipher_nonce = XNonce::try_from(nonce).map_err(|_| Error::InvalidLength)?;
     let decrypted = Zeroizing::new(
