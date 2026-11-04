@@ -1,0 +1,8 @@
+# Regression input from PR #60 macOS job. The keypair and signature were
+# generated in that process and were not logged; only public test input kept.
+message_hex=5017be88933bbf2349a138bf2636dea1f3b3
+context_hex=7690ad8d06146f45d1861350ad9abcf4bf061259af62897a5ffaefcaf96ae687d88b0e0b8ddc9b2959ecef0c4fbb76103c777275f41c22b216296feacf51e45f86
+message_bit=404
+signature_bit=26364
+proptest_persistence_hash=086e3a923d62494f613b6cebb1bfb44ed90080ad1a96da933b6d904ef9a7dc07
+panic_site=Signature::from_bytes(changed_signature).unwrap() after a one-bit corruption
