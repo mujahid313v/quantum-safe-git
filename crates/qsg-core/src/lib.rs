@@ -5,14 +5,15 @@
 use getrandom::SysRng;
 use ml_dsa::{
     EncodedSignature, EncodedVerifyingKey, ExpandedSigningKey, ExpandedSigningKeyBytes, Generate,
-    Keypair, MlDsa65, Signature as MlSignature, SigningKey, VerifyingKey,
+    Keypair, MlDsa65, Seed as MlDsaSeed, Signature as MlSignature, SigningKey, VerifyingKey,
 };
 use thiserror::Error;
-use zeroize::Zeroize;
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 pub const PUBLIC_KEY_SIZE: usize = 1952;
 pub const SECRET_KEY_SIZE: usize = 4032;
 pub const SIGNATURE_SIZE: usize = 3309;
+pub const SEED_SIZE: usize = 32;
 const MAX_CONTEXT_SIZE: usize = 255;
 
 #[derive(Debug, Error)]
@@ -79,6 +80,32 @@ impl SecretKey {
     }
 }
 
+/// Zeroizing 32-byte ML-DSA seed, suitable for encrypted storage.
+#[derive(Zeroize, ZeroizeOnDrop)]
+pub struct Seed([u8; SEED_SIZE]);
+
+fn assert_zeroize_on_drop<T: ZeroizeOnDrop>() {}
+const _: fn() = assert_zeroize_on_drop::<Seed>;
+
+impl Seed {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() != SEED_SIZE {
+            return Err(Error::InvalidLength {
+                kind: "seed",
+                expected: SEED_SIZE,
+                actual: bytes.len(),
+            });
+        }
+        let mut value = Zeroizing::new([0; SEED_SIZE]);
+        value.copy_from_slice(bytes);
+        Ok(Self(core::mem::take(&mut *value)))
+    }
+
+    pub fn as_bytes(&self) -> &[u8; SEED_SIZE] {
+        &self.0
+    }
+}
+
 impl Drop for SecretKey {
     fn drop(&mut self) {
         self.0.zeroize();
@@ -113,6 +140,35 @@ pub fn keygen() -> Result<(PublicKey, SecretKey)> {
     #[allow(deprecated)]
     let secret = signing_key.expanded_key().to_expanded();
     Ok((PublicKey(public), SecretKey(secret)))
+}
+
+/// Generate an ML-DSA keypair and return its zeroizing 32-byte seed as well.
+pub fn keygen_with_seed() -> Result<(PublicKey, SecretKey, Seed)> {
+    let signing_key = SigningKey::<MlDsa65>::try_generate_from_rng(&mut SysRng)
+        .map_err(|_| Error::RandomnessUnavailable)?;
+    let public = PublicKey(signing_key.verifying_key().encode());
+    #[allow(deprecated)]
+    let secret = SecretKey(signing_key.expanded_key().to_expanded());
+    let backend_seed = Zeroizing::new(signing_key.to_seed());
+    let mut seed = Zeroizing::new([0; SEED_SIZE]);
+    seed.copy_from_slice(backend_seed.as_slice());
+    Ok((public, secret, Seed(core::mem::take(&mut *seed))))
+}
+
+/// Reconstruct the ML-DSA keypair from its 32-byte seed.
+pub fn keygen_from_seed(seed: &Seed) -> Result<(PublicKey, SecretKey)> {
+    let backend_seed = Zeroizing::new(MlDsaSeed::try_from(seed.as_bytes().as_slice()).map_err(
+        |_| Error::InvalidLength {
+            kind: "seed",
+            expected: SEED_SIZE,
+            actual: seed.as_bytes().len(),
+        },
+    )?);
+    let signing_key = SigningKey::<MlDsa65>::from_seed(&backend_seed);
+    let public = PublicKey(signing_key.verifying_key().encode());
+    #[allow(deprecated)]
+    let secret = SecretKey(signing_key.expanded_key().to_expanded());
+    Ok((public, secret))
 }
 
 pub fn sign(secret: &SecretKey, message: &[u8], context: &[u8]) -> Result<Signature> {
@@ -198,6 +254,25 @@ mod tests {
         assert!(SecretKey::from_bytes(&[0; 4033]).is_err());
         assert!(Signature::from_bytes(&[0; 3308]).is_err());
         assert!(Signature::from_bytes(&[0; 3310]).is_err());
+        assert!(Seed::from_bytes(&[0; 31]).is_err());
+        assert!(Seed::from_bytes(&[0; 33]).is_err());
+    }
+
+    #[test]
+    fn seed_reconstructs_same_keypair() {
+        let (public, secret, seed) = keygen_with_seed().unwrap();
+        let (reconstructed_public, reconstructed_secret) = keygen_from_seed(&seed).unwrap();
+        assert_eq!(public.as_bytes(), reconstructed_public.as_bytes());
+        let first = sign(&secret, b"seed reconstruction", b"test").unwrap();
+        let second = sign(&reconstructed_secret, b"seed reconstruction", b"test").unwrap();
+        verify(
+            &reconstructed_public,
+            b"seed reconstruction",
+            &first,
+            b"test",
+        )
+        .unwrap();
+        verify(&public, b"seed reconstruction", &second, b"test").unwrap();
     }
 
     #[test]
