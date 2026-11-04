@@ -12,12 +12,12 @@
 | Passphrase-less keys | Convenient but weak | M3 permits this only through an explicit API flag and returns an unencrypted-kind marker; the file remains mode 0600 on Unix. This is not audited and provides no confidentiality |
 | Argon2id working-memory disclosure | Freed Argon2id internal working memory is not wiped | Argon2id internal working memory is not wiped when freed (argon2 0.6.0, verified by source inspection). Passphrase, seed, derived key and decrypted buffers are zeroized. Memory disclosure (core dumps, swap, cold boot) may expose key-derivation intermediates. Not audited. |
 | Malware using an unlocked key | Can sign arbitrary commits | Out of scope; mention in docs |
-| Malicious change to `allowed_signers` | e.g. inside a pull request | CI reads it from the base branch or pipeline config |
+| Malicious change to `allowed_signers` | e.g. inside a pull request | M4 strictly parses supported entries, but CI must still read the trust file from the base branch or trusted pipeline configuration; not audited |
 | Backdated commits | Signer controls the commit time | Documented; trusted timestamping is future work |
-| Revocation delay or coarse revocation | See trust model | Documented limitation |
+| Revocation delay or coarse revocation | A revoked key has no effective date; an old valid signature also fails | M4 rejects every signature by a listed fingerprint; revocation takes effect only where the updated list is used; not audited |
 | Unsigned commits | Nothing forces signing | `qsg verify-range` plus branch protection |
 | Force-push or history rewrite | `verify-range` does not detect it | Branch protection and server-side rules |
-| Parser bugs | SSHSIG container parser reads untrusted input; `allowed_signers` parsing is future work | Strict parsing, fuzzing |
+| Parser bugs | SSHSIG and `allowed_signers` parsers read untrusted input | Strict parsing, property tests, and a cargo-fuzz target; not audited |
 | Supply chain | liboqs or crates compromised; tampered release binaries | Pinned versions, cargo-audit and cargo-deny, signed checksums |
 | Wrong identity | Principal not tied to commit author | Documented limitation |
 
@@ -25,3 +25,4 @@
 
 - `qsg-sshsig` rejects unsupported SSHSIG versions, namespaces, reserved/hash fields, key types, malformed lengths, trailing bytes, and oversized input. Property tests exercise arbitrary decoder input; a cargo-fuzz target is available, but no fuzz campaign has been run.
 - `qsg-keystore` encrypts the ML-DSA seed, bounds Argon2 parameters, authenticates its header, and enforces private Unix modes; this implementation has not been audited.
+- `qsg-trust` enforces exact principals, required Git namespace, bounded parsing, validity windows, and fingerprint revocation; this implementation has not been audited.

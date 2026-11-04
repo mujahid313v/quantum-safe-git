@@ -27,6 +27,8 @@ jobs:
         run: python3 crates/qsg-core/tests/fetch_acvp_vectors.py
       - name: OpenSSH version
         run: ssh -V
+      - name: Git verify-time behavior
+        run: python3 tools/spike/verify_time.py --check
       - name: Test
         env:
           QSG_REQUIRE_SSH_KEYGEN: "1"
