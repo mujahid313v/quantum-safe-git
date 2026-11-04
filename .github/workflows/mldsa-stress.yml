@@ -2,9 +2,12 @@ name: ML-DSA intermittent stress (manual)
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
 
 jobs:
   repeat-core-tests:
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'fix/mldsa-intermittent'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -24,6 +27,7 @@ jobs:
         run: cargo test -p qsg-core
 
   million-signature-stress:
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'fix/mldsa-intermittent'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
