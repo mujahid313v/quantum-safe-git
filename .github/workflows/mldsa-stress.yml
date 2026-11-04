@@ -1,0 +1,41 @@
+name: ML-DSA intermittent stress (manual)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  repeat-core-tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        run: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: |
+          rustup update stable
+          rustup default stable
+          rustup component add clippy rustfmt
+      - name: Record runner architecture
+        run: uname -m
+      - name: qsg-core tests, repetition ${{ matrix.run }}
+        run: cargo test -p qsg-core
+
+  million-signature-stress:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: |
+          rustup update stable
+          rustup default stable
+      - name: Record runner architecture
+        run: uname -m
+      - name: One million randomized sign/verify operations
+        run: cargo test -p qsg-core --release --test intermittent_regression million_hedged_signatures_verify -- --ignored --nocapture

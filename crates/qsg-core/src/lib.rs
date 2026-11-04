@@ -232,8 +232,13 @@ mod tests {
             prop_assert!(verify(&pk, &changed_message, &sig, &context).is_err());
             let mut changed_signature = sig.as_bytes().to_vec();
             changed_signature[signature_bit / 8] ^= 1 << (signature_bit % 8);
-            let changed_signature = Signature::from_bytes(&changed_signature).unwrap();
-            prop_assert!(verify(&pk, &message, &changed_signature, &context).is_err());
+            match Signature::from_bytes(&changed_signature) {
+                Ok(changed_signature) => {
+                    prop_assert!(verify(&pk, &message, &changed_signature, &context).is_err());
+                }
+                Err(Error::InvalidSignature) => {}
+                Err(error) => prop_assert!(false, "unexpected signature parse error: {error}"),
+            }
         }
     }
 }
