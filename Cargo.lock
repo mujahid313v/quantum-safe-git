@@ -813,6 +813,16 @@ dependencies = [
 [[package]]
 name = "qsg-trust"
 version = "0.1.0"
+dependencies = [
+ "base64",
+ "ed25519-dalek",
+ "proptest",
+ "qsg-core",
+ "qsg-sshsig",
+ "ssh-key",
+ "tempfile",
+ "thiserror",
+]
 
 [[package]]
 name = "quick-error"

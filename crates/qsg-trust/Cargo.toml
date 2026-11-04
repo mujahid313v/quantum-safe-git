@@ -4,3 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+base64 = "=0.22.1"
+qsg-sshsig = { path = "../qsg-sshsig" }
+thiserror = "=2.0.18"
+
+[dev-dependencies]
+ed25519-dalek = "=2.2.0"
+qsg-core = { path = "../qsg-core" }
+proptest = "=1.9.0"
+ssh-key = { version = "=0.6.7", default-features = false, features = ["ed25519", "std"] }
+tempfile = "=3.27.0"
