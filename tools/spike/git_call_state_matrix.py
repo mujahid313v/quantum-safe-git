@@ -109,7 +109,7 @@ def main():
                 allowed_key = pub2
             else:
                 allowed_key = pub1
-            validity = ',valid-before=20200101Z' if state == "expired" else ""
+            validity = ',valid-before="20200101Z"' if state == "expired" else ""
             allowed = root / f"allowed-{state}"
             allowed.write_text(
                 f'{PRINCIPAL} namespaces="git"{validity} {allowed_key}\n',
