@@ -219,6 +219,45 @@ def main():
             if result.returncode == 0 or modes != ["find-principals", "verify"]:
                 raise AssertionError(f"tampered Ed25519 commit result/calls invalid: {result}, {calls}")
 
+        def observe_revoked_key():
+            repo = root / "repo-revoked"
+            repo.mkdir()
+            env = configure(repo, "trusted")
+            signed_commit(repo, env, "revoked key")
+            krl = root / "revoked.krl"
+            run(
+                ["ssh-keygen", "-q", "-k", "-f", str(krl), str(key1.with_suffix('.pub'))],
+                cwd=root,
+                env=env,
+            )
+            query = subprocess.run(
+                ["ssh-keygen", "-Q", "-f", str(krl), str(key1.with_suffix('.pub'))],
+                cwd=root,
+                env=env,
+                text=True,
+                capture_output=True,
+            )
+            if query.returncode == 0:
+                raise AssertionError("ssh-keygen -Q did not report the signer as revoked")
+            run(
+                ["git", "config", "gpg.ssh.revocationFile", str(krl)],
+                cwd=repo,
+                env=env,
+            )
+            log.write_text("", encoding="utf-8")
+            result = run(["git", "verify-commit", "HEAD"], cwd=repo, env=env, check=False)
+            calls = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+            verify_calls = [call for call in calls if "-Y" in call and call[call.index("-Y") + 1] == "verify"]
+            has_revocation_arg = len(verify_calls) == 1 and "-r" in verify_calls[0] and verify_calls[0][verify_calls[0].index("-r") + 1] == str(krl)
+            print(
+                f"D7 revoked Ed25519 KRL; exit={result.returncode}; "
+                f"verify_has_-r={has_revocation_arg}; stdout={result.stdout.strip()!r}; "
+                f"stderr={result.stderr.strip()!r}",
+                flush=True,
+            )
+            if result.returncode == 0 or not has_revocation_arg:
+                raise AssertionError(f"revocation-file verification failed to fail closed: {result}, {calls}")
+
         for command in (
             "verify-commit",
             "verify-tag",
@@ -229,6 +268,7 @@ def main():
             for state in ("trusted", "untrusted", "expired"):
                 observe(state, command)
         observe_tampered_commit()
+        observe_revoked_key()
 
 
 if __name__ == "__main__":

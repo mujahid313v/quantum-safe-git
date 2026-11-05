@@ -1,7 +1,8 @@
 use qsg_keystore::generate;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 use tempfile::TempDir;
 
 const PRINCIPAL: &str = "qsgit-m5a@example.test";
@@ -474,4 +475,61 @@ fn git_openssh_revocation_file_blocks_revoked_ed25519_key() {
         !result.status.success(),
         "Git accepted an Ed25519 key independently confirmed as revoked by ssh-keygen -Q"
     );
+}
+
+#[test]
+fn shim_rejects_a_crafted_non_git_namespace_signature() {
+    let setup = setup();
+    let message = b"namespace test message\n";
+    let (public, secret, _) = qsg_keystore::load_secret(&setup.key1, None, true).unwrap();
+    let mut record = qsg_sshsig::sign_ml_dsa65(&public, &secret, message).unwrap();
+    record.namespace = "other".to_owned();
+
+    // Assemble the SSHSIG blob directly because the library's encoder refuses
+    // non-git namespaces by design. The decoder/shim must still reject it.
+    let mut blob = b"SSHSIG".to_vec();
+    blob.extend_from_slice(&1u32.to_be_bytes());
+    for field in [
+        record.public_key.as_slice(),
+        record.namespace.as_bytes(),
+        record.reserved.as_slice(),
+        record.hash_algorithm.as_bytes(),
+        record.signature.as_slice(),
+    ] {
+        blob.extend_from_slice(&(field.len() as u32).to_be_bytes());
+        blob.extend_from_slice(field);
+    }
+    let armor = qsg_sshsig::encode_armor(&blob).unwrap();
+    let signature = setup.temp.path().join("wrong-namespace.sig");
+    fs::write(&signature, armor).unwrap();
+
+    let mut child = Command::new(env!("CARGO_BIN_EXE_qsg-ssh-keygen"))
+        .args([
+            "-Y",
+            "verify",
+            "-n",
+            "git",
+            "-f",
+            setup.allowed.to_str().unwrap(),
+            "-I",
+            PRINCIPAL,
+            "-s",
+            signature.to_str().unwrap(),
+            "-Overify-time=20250101000000",
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child.stdin.take().unwrap().write_all(message).unwrap();
+    let output = child.wait_with_output().unwrap();
+    println!(
+        "D7 wrong namespace (direct shim): exit={:?}; stdout={:?}; stderr={:?}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(output.status.code(), Some(255));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("unsupported SSHSIG namespace"));
 }
