@@ -33,7 +33,7 @@ git config gpg.ssh.allowedSignersFile <file>
 - Verify output line accepted by Git: `Good "git" signature for <principal> with <KEYTYPE> key <fingerprint>`.
 - On failure the program exited 255 and printed a message on stdout; `git verify-commit` then exited 1 and showed the message.
 
-- `git verify-commit`, `git verify-tag`, `git log --show-signature` and `git merge --verify-signatures` each ran one find-principals call followed by one verify call.
+- For a trusted key, `git verify-commit`, `git verify-tag`, `git log --show-signature` and `git merge --verify-signatures` run one find-principals call followed by one verify call. If no principal is found, Git may use the `check-novalidate` fallback described in M5a.
 - The signature is stored in the commit's `gpgsig` header between `-----BEGIN SSH SIGNATURE-----` and `-----END SSH SIGNATURE-----`.
 
 - Git did not validate the blob: a dummy blob and a non-standard key type name in the "Good" line were accepted.
@@ -53,7 +53,7 @@ Observed behavior: Git formats the commit's epoch timestamp in the machine's loc
 - Whether Git requires the `-----BEGIN SSH SIGNATURE-----` prefix.
 - Whether stderr output from the program matters.
 
-- Whether `check-novalidate` or `-r` (revocation file) is ever used.
+- Whether `-r` (revocation file) is ever used.
 - M0 Git call shapes on Linux/macOS, and behavior on Git versions other than those listed above.
 
 ## Consequences for QSGit
@@ -63,3 +63,29 @@ Observed behavior: Git formats the commit's epoch timestamp in the machine's loc
 - The shim must print exactly the `Good "git" signature for ...` line on success.
 
 - M4 trust parsing treats Git's no-`Z` verify time as local civil time. When comparing it to a UTC validity date, callers must supply an explicit UTC offset.
+
+## M5a QSGit shim behavior
+
+The `qsg-ssh-keygen` executable now implements the three Git calls above. It accepts `-Y sign -n git -f <keyfile> <buffer>`, `-Y find-principals -f <allowed_signers> -s <sigfile> -Overify-time=<time>`, and `-Y verify -n git -f <allowed_signers> -I <principal> -s <sigfile> -Overify-time=<time>`. Both `-Overify-time=<time>` and `-O verify-time=<time>` are accepted. The find-principals call intentionally has no `-n`; the shim obtains and checks the namespace from the signature. Other subcommands, flags, positional arguments, non-Git namespaces, and ssh-agent `-U` calls fail with status 255. A `.pub` signing-key path resolves through `qsg-keystore` to the corresponding private key.
+
+The shim prompts for encrypted-key passphrases through the terminal, never Git's stdin. On success, verify prints `Good "git" signature for <principal> with MLDSA65 key <SHA256:fingerprint>`. No matching principal exits 255 and prints `No principal matched.`. The shim limits signature files to 128 KiB, `allowed_signers` and revocation files to 1 MiB, and signed stdin to 16 MiB. See [USER_GUIDE.md](USER_GUIDE.md) for exit codes and revocation configuration.
+
+M5a end-to-end coverage runs a real signed commit and tag through Git, checks `git verify-commit`, `git verify-tag`, and `git log --show-signature`, then exercises tampering, an untrusted key, a validity window, and revocation. On Windows 11, Git 2.55.0.windows.5 and OpenSSH_for_Windows 9.5p2 (LibreSSL 3.8.2), the local tests passed. Linux/macOS CI results are pending for this branch.
+
+Rechecking the failure path found one additional Git call: if `find-principals` returns no principal, Git invokes `-Y check-novalidate -n git -s <sigfile>` before it reports verification failure. The M5a shim intentionally rejects this subcommand, as scoped, with status 255 and `unsupported -Y subcommand: check-novalidate`. Therefore an untrusted or expired key fails closed, but Git surfaces that unsupported-call diagnostic instead of OpenSSH's generic trust failure. Successful trusted verification still uses `find-principals` followed by `verify`.
+
+The test uses a 2020 author date with a 2025 committer date and verifies against a window that includes only the latter; verification succeeds. It then signs a tag with a 2025 tagger date pointing at a commit dated 2020; tag verification also succeeds. Therefore Git's `-Overify-time` uses the **committer date for commits** and the **tagger date for tags** in the tested Git 2.55.0.windows.5 setup. Git formats both in the verifier machine's local zone without `Z`. The shim resolves local civil time to UTC only when a matching trust entry has a UTC validity boundary; details and DST behavior are in [ADR 0003](adr/0003-local-time-offset.md) and [TRUST-MODEL.md](TRUST-MODEL.md).
+
+### OpenSSH failure comparison
+
+The following baseline was observed with OpenSSH_for_Windows 9.5p2 using Ed25519 keys and `ssh-keygen -Y verify` directly (Windows reports process status 255 as signed `-1`):
+
+| Case | Real `ssh-keygen` result | QSGit shim result |
+|---|---|---|
+| No principal for key | Direct `find-principals`: 255, `No principal matched.`; Git then makes a `check-novalidate` fallback call. | Direct `find-principals` matches OpenSSH. During Git verification, fallback is rejected with 255 and `unsupported -Y subcommand: check-novalidate`. |
+| Bad signature | 255, `Could not verify signature.` and `Signature verification failed: incorrect signature` | 255; generic `Could not verify signature.` plus the same incorrect-signature explanation. ML-DSA bad-signature behavior is also covered by QSGit vectors. |
+| Unknown principal | 255, `Could not verify signature.` | 255; `Could not verify signature.` plus QSGit's `no trusted key matches...` reason. |
+| Wrong namespace | 255, `Could not verify signature.` and `Couldn't verify signature: namespace does not match` | Rejected during `find-principals` because the stored namespace must be `git`; 255 with a clear namespace error. |
+| Expired key | Direct verify: 255, `Could not verify signature.` plus an `allowed_signers` line diagnostic naming the expiry and verify time. Git may use its no-principal fallback. | Git's expired-key flow returns no principal, then the shim rejects `check-novalidate` with 255. |
+
+Ed25519 keys are used only to establish the stock OpenSSH message behavior; QSGit's shim intentionally supports its ML-DSA-65 key type. These are message-shape comparisons, not cryptographic interoperability between the algorithms.

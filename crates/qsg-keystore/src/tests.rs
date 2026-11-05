@@ -79,6 +79,10 @@ fn wrong_passphrase_and_existing_key_are_rejected() {
         Err(Error::WrongPassphraseOrCorrupt)
     ));
     assert!(matches!(
+        load_secret(&info.private_path, None, false),
+        Err(Error::PassphraseRequired)
+    ));
+    assert!(matches!(
         generate(dir.path(), "key", Some(&passphrase), "", false, false),
         Err(Error::AlreadyExists)
     ));

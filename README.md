@@ -10,14 +10,15 @@ An earlier prototype (Dilithium-3, pre-standard parameters) lives on the `legacy
 
 | Item | Status |
 |------|--------|
-| M0: Git SSH-signing interface spike | Done on Windows (Git 2.55, OpenSSH 10.5). Linux/macOS not yet re-run. See [docs/GIT-INTERFACE.md](docs/GIT-INTERFACE.md) |
-| Empty Cargo workspace | Done (compiles, no functionality) |
-| ML-DSA signing and verification | Planned (M1) |
-| Everything else | Planned |
+| M0: Git SSH-signing interface spike | Verified on Windows (Git 2.55, OpenSSH 10.5); CI experiments on Linux/macOS documented. See [docs/GIT-INTERFACE.md](docs/GIT-INTERFACE.md) |
+| M1–M4 libraries | Implemented; review and security audit pending |
+| M5a: `qsg keygen`, `qsg pubkey`, Git SSH-signing shim | Implemented; Windows end-to-end checked locally; Linux/macOS CI pending |
+| M5b: trust/verify/verify-range/doctor commands | Planned |
+| M6–M8 | Planned |
 
-Nothing below works yet.
+M1–M4 library functionality is implemented. M5a adds key generation, public-key display, and a Git signing/verifying shim; its end-to-end test passes locally on Windows. Linux/macOS CI confirmation is pending for this integration.
 
-## Intended workflow (planned, not working yet)
+## M5a workflow
 
 ```bash
 qsg keygen                                   # create an ML-DSA-65 key pair
@@ -29,11 +30,11 @@ git commit -S -m "signed commit"
 git verify-commit HEAD
 ```
 
-## Components (planned)
+## Components
 
-- `qsg`: CLI (`keygen`, `pubkey`, `sign`, `verify`, `verify-range`, `trust add|list|revoke`, `doctor`).
-- `qsg-ssh-keygen`: a small program implementing the `ssh-keygen -Y sign | find-principals | verify` calls that Git makes.
-- Workspace crates: `qsg-core`, `qsg-sshsig`, `qsg-keystore`, `qsg-trust`, `qsg-cli` (builds the `qsg` binary), `qsg-ssh-keygen`.
+- `qsg`: M5a implements `keygen` and `pubkey`; more commands are planned for M5b.
+- `qsg-ssh-keygen`: implements the Git `-Y sign`, `find-principals`, and `verify` calls.
+- Workspace libraries: `qsg-core`, `qsg-sshsig`, `qsg-keystore`, and `qsg-trust`.
 
 Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The list of what is out of scope for v0.1 lives there, in one place.
 
@@ -51,7 +52,8 @@ Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The list of what is out o
 | M2 | SSHSIG-style format and spec, test vectors | Implemented on `m2/sshsig`; OpenSSH interoperability verified on Windows, Ubuntu, and macOS CI |
 | M3 | Encrypted key storage | Implemented on `m3/keystore`; review pending |
 | M4 | allowed_signers parsing, validity, revocation | Implemented on `m4/trust`; review pending |
-| M5 | `qsg-ssh-keygen` and `qsg` CLI | Planned |
+| M5a | `qsg keygen`, `qsg pubkey`, and `qsg-ssh-keygen` Git shim | Implemented; Windows end-to-end checked locally; Linux/macOS CI pending |
+| M5b | `trust`, `verify`, `verify-range`, and `doctor` CLI commands | Planned |
 | M6 | End-to-end tests and CI | Planned |
 | M7 | Documentation and security pass | Planned |
 | M8 | v0.1.0 release candidate | Planned |

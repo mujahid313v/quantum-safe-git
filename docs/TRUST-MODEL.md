@@ -1,6 +1,6 @@
 # Trust model
 
-**Status: design. Experimental. No audit.**
+**Status: M4 trust library and M5a shim integration implemented. Experimental. No audit.**
 
 ## Who is trusted
 
@@ -12,7 +12,9 @@ Format (OpenSSH-compatible, custom key type):
 <principals> <options> ssh-mldsa65@qsgit <base64 public key blob> [comment]
 ```
 
-`valid-after` and `valid-before` accept `YYYYMMDD[Z]` or `YYYYMMDDHHMM[SS][Z]`, verified against ssh-keygen(1) and real OpenSSH. A missing `Z` means local civil time; `Z` means UTC. QSGit compares times naively when both use the same basis. If an allowed-signer time and verify time have different bases, callers must provide the explicit local UTC offset; otherwise checking returns an error. No local-time database is used.
+`valid-after` and `valid-before` accept `YYYYMMDD[Z]` or `YYYYMMDDHHMM[SS][Z]`, verified against ssh-keygen(1) and real OpenSSH. A missing `Z` means local civil time; `Z` means UTC. QSGit compares times naively when both use the same basis. For Git's local verify-time and a `Z` validity date, the M5a shim obtains the operating system's offset for that local civil time and converts it to UTC. It asks for the offset only when a matching signer entry needs a mixed-basis comparison. If the offset cannot be determined, verification fails closed. The method and dependency are documented in [ADR 0003](adr/0003-local-time-offset.md).
+
+The shim does not bundle a time-zone database. During a daylight-saving fall-back, the same local clock time occurs twice and Git's `-Overify-time` string does not distinguish the two occurrences. QSGit detects multiple possible UTC instants and fails closed when a mixed-basis validity comparison needs the offset. Nonexistent local times fail closed as well.
 
 Both boundaries are inclusive: a key is valid at exactly `valid-after` and exactly `valid-before`. This matches ssh-keygen(1) and real OpenSSH tests.
 
@@ -38,6 +40,8 @@ Git passes `-Overify-time=YYYYMMDDHHMMSS` derived from the commit's timestamp. T
 ## Revocation (v0.1 limits)
 
 A revocation file contains one canonical `SHA256:<unpadded-base64>` fingerprint per line; blank lines and `#` comments are ignored. A malformed fingerprint fails parsing. A revoked key fails for all its signatures, including legitimate old ones, because the list has no effective date. "Revocation with effective date" is an open decision. Revocation also takes effect only where verifiers have the updated list.
+
+The M5a Git shim reads the path in `QSG_REVOKED_KEYS` when that environment variable is set. Otherwise it looks for `revoked_keys` in the same directory as the `allowed_signers` file and uses an empty list if no sibling file exists. If the environment variable is set but the file is missing or malformed, verification fails closed. Git has no revocation-file argument for a custom `gpg.ssh.program`; Git inherits the environment variable from its caller.
 
 ## Identity binding
 
