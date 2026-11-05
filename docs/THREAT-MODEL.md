@@ -22,6 +22,7 @@
 | Wrong identity | Principal not tied to commit author | Documented limitation |
 | Passphrase capture | A hostile process can observe terminal input or compromise the process | M5a prompts through the terminal without echo and never reads the passphrase from Git's stdin; prompt and shim code are not audited |
 | Git shim/parser failures | Git supplies paths, signatures, verify-time values, and signed data | M5a strictly accepts only Git's observed `-Y` calls, caps signatures at 128 KiB, allowed_signers/revocation input at 1 MiB, and signing/verification messages at 16 MiB; code is not audited |
+| Misconfigured Git revocation file | Git may pass `-r <file>` to the custom verifier | M5a rejects `-r` with exit 255, so verification fails closed. Do not set `gpg.ssh.revocationFile` with QSGit; use `QSG_REVOKED_KEYS` or sibling `revoked_keys`. Deliberate v0.1 limitation; support for a QSGit list via `-r` may be added later. |
 
 ## Mitigations currently implemented
 

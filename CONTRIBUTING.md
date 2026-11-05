@@ -5,7 +5,7 @@ QSGit is experimental and moves in small milestones (see the roadmap in the READ
 ## Setup
 
 - Rust stable, MSRV 1.87: `rustup component add clippy rustfmt`
-- Git 2.34 or newer (SSH-format signing)
+- Tested with Git 2.55.0 on Windows and Git 2.56.0 on Ubuntu and macOS. Git 2.34 is the first version with SSH signing, but is untested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
 - Target platforms for v0.1: Linux and macOS. Development on Windows is possible but not a target; WSL is recommended.
 - Extra tools depend on the crypto backend chosen in ADR 0001 (for liboqs: CMake and a C compiler).
 

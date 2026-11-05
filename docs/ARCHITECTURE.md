@@ -57,7 +57,7 @@ Not goals at all: blockchain, machine-learning anomaly detection, mobile app, ma
 
 ## Platforms
 
-v0.1 targets Linux and macOS with Git 2.34 or newer. The spike ran on Windows only so far.
+v0.1 targets Linux and macOS. Tested with Git 2.55.0 on Windows and Git 2.56.0 on Ubuntu and macOS. Git 2.34 is the first version with SSH signing, but is untested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
 
 ## SHA-256 repositories
 

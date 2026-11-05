@@ -453,8 +453,11 @@ fn git_openssh_revocation_file_blocks_revoked_ed25519_key() {
         .output()
         .expect("query OpenSSH KRL");
     assert!(
-        !krl_query.status.success(),
-        "the generated KRL does not revoke the Ed25519 public key"
+        !krl_query.status.success()
+            && String::from_utf8_lossy(&krl_query.stdout)
+                .to_ascii_uppercase()
+                .contains("REVOKED"),
+        "ssh-keygen -Q did not report the Ed25519 public key as revoked"
     );
     success(git(
         &repo,

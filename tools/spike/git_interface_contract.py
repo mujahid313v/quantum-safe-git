@@ -179,6 +179,7 @@ def main():
         signs = [call for call in calls if "sign" in call["args"]]
         finds = [call for call in calls if "find-principals" in call["args"]]
         verifies = [call for call in calls if "verify" in call["args"]]
+        assert all("-r" not in call["args"] for call in signs), signs
         assert all("-r" not in call["args"] for call in finds), finds
         assert all(
             "-r" in call["args"]

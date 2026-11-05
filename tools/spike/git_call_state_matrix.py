@@ -179,6 +179,8 @@ def main():
             expected = ["find-principals", "verify"] if state == "trusted" else ["find-principals", "check-novalidate"]
             if modes != expected:
                 raise AssertionError(f"{state}/{operation}: expected {expected}, got {modes}; calls={calls}")
+            if any("-r" in call for call in calls):
+                raise AssertionError(f"{state}/{operation}: unexpected -r without revocation config: {calls}")
             if state == "trusted" and result.returncode != 0:
                 raise AssertionError(f"trusted {operation} failed: {result.stderr}")
             if state != "trusted" and operation != "log --show-signature" and result.returncode == 0:
@@ -218,6 +220,8 @@ def main():
             )
             if result.returncode == 0 or modes != ["find-principals", "verify"]:
                 raise AssertionError(f"tampered Ed25519 commit result/calls invalid: {result}, {calls}")
+            if any("-r" in call for call in calls):
+                raise AssertionError(f"tampered commit: unexpected -r without revocation config: {calls}")
 
         def observe_revoked_key():
             repo = root / "repo-revoked"
@@ -237,7 +241,7 @@ def main():
                 text=True,
                 capture_output=True,
             )
-            if query.returncode == 0:
+            if query.returncode == 0 or "REVOKED" not in query.stdout.upper():
                 raise AssertionError("ssh-keygen -Q did not report the signer as revoked")
             run(
                 ["git", "config", "gpg.ssh.revocationFile", str(krl)],
