@@ -24,6 +24,12 @@ def run(args, *, cwd=None, env=None, check=True):
 
 
 def main():
+    git_version = run(["git", "--version"]).stdout.strip()
+    print(
+        f"Git={git_version}; OS={platform.system()} {platform.release()}; "
+        f"Python={platform.python_version()}",
+        flush=True,
+    )
     with tempfile.TemporaryDirectory(prefix="qsg-m0-git-contract-") as temp:
         root = Path(temp)
         log = root / "calls.jsonl"
@@ -36,7 +42,7 @@ def main():
             "with open(os.environ['QSG_M0_CALL_LOG'],'a',encoding='utf-8') as f:\n"
             " f.write(json.dumps({'operation':os.environ.get('QSG_M0_OPERATION'),'args':args,'stdin_bytes':len(data),'buffer_exists':pathlib.Path(args[-1]).is_file() if mode=='sign' else None})+'\\n')\n"
             "print('M0 stderr probe',file=sys.stderr)\n"
-            f"if mode=='sign': pathlib.Path(args[-1]+'.sig').write_text({NON_ARMOR!r},encoding='ascii'); sys.exit(0)\n"
+            f"if mode=='sign': pathlib.Path(args[-1]+'.sig').write_text('-----BEGIN SSH SIGNATURE-----\\nAAAA\\n-----END SSH SIGNATURE-----\\n' if os.environ.get('QSG_M0_ARMOR') else {NON_ARMOR!r},encoding='ascii'); sys.exit(0)\n"
             f"if mode=='find-principals': print({PRINCIPAL!r}); sys.exit(0)\n"
             f"if mode=='verify': print('Good \\\"git\\\" signature for {PRINCIPAL} with ED25519 key SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'); sys.exit(0)\n"
             "sys.exit(2)\n",
@@ -74,12 +80,44 @@ def main():
         env["GIT_CONFIG_GLOBAL"] = str(root / "global-config")
         env["GIT_CONFIG_NOSYSTEM"] = "1"
 
-        def run_git(args, operation, cwd=repo):
+        def run_git(args, operation, cwd=repo, armor=True):
             operation_env = env.copy()
             operation_env["QSG_M0_OPERATION"] = operation
-            return run(["git", *args], cwd=cwd, env=operation_env)
+            if armor:
+                operation_env["QSG_M0_ARMOR"] = "1"
+            before = len(log.read_text(encoding="utf-8").splitlines()) if log.exists() else 0
+            result = run(["git", *args], cwd=cwd, env=operation_env, check=False)
+            print(
+                f"git {operation}: exit={result.returncode}; "
+                f"program stderr surfaced={'M0 stderr probe' in result.stderr}; "
+                f"stderr={result.stderr.strip()}",
+                flush=True,
+            )
+            if log.exists():
+                entries = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+                for entry in entries[before:]:
+                    print(json.dumps(entry, sort_keys=True), flush=True)
+            if result.returncode:
+                raise RuntimeError(
+                    f"git {operation} failed ({result.returncode}): "
+                    f"stdout={result.stdout}\nstderr={result.stderr}"
+                )
+            return result
 
-        run_git(["commit", "-S", "-m", "signed commit"], "commit -S")
+        run_git(["commit", "-S", "-m", "non-armor signature"], "commit -S non-armor", armor=False)
+        non_armor_hash = run(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
+        bad_format = run(["git", "verify-commit", "HEAD"], cwd=repo, env=env, check=False)
+        assert bad_format.returncode != 0, "Git accepted a non-armor signature during verification"
+        assert "bad/incompatible signature" in bad_format.stderr, bad_format.stderr
+        print(
+            f"Non-armor verify-commit: exit={bad_format.returncode}; "
+            f"stderr={bad_format.stderr.strip()}",
+            flush=True,
+        )
+        non_armor_commit = run(["git", "cat-file", "commit", non_armor_hash], cwd=repo).stdout
+        assert NON_ARMOR in non_armor_commit, "Git did not retain the non-armor signature payload"
+
+        run_git(["commit", "--allow-empty", "-S", "-m", "signed commit"], "commit -S")
         run_git(["verify-commit", "HEAD"], "verify-commit")
         run_git(["log", "--show-signature", "-1"], "log --show-signature")
 
@@ -140,17 +178,8 @@ def main():
         assert all(call["args"][:2] == ["-Y", "find-principals"] for call in finds), finds
         assert all(call["args"][:2] == ["-Y", "verify"] for call in verifies), verifies
         assert all(any(arg.startswith("-Overify-time=") for arg in call["args"]) for call in finds + verifies)
-        signed = run(["git", "cat-file", "commit", "HEAD"], cwd=repo).stdout
-        assert NON_ARMOR in signed, "Git did not retain the non-armor signature payload"
-        print(
-            f"Git={run(['git','--version']).stdout.strip()}; "
-            f"OS={platform.system()} {platform.release()}; Python={platform.python_version()}"
-        )
-        print("Git accepted a signature payload without the SSH SIGNATURE armor header.")
+        print("Git commit accepted and stored non-armor output; verify-commit rejected it as bad/incompatible.")
         print("Successful Git operations tolerated program stderr (M0 stderr probe).")
-        print("Observed calls:")
-        for call in calls:
-            print(json.dumps(call, sort_keys=True))
         print("No check-novalidate or -r observed in these trusted-signature flows.")
 
 
