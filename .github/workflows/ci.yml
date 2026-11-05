@@ -29,6 +29,8 @@ jobs:
         run: ssh -V
       - name: Git verify-time behavior
         run: python3 tools/spike/verify_time.py --check
+      - name: Git SSH interface contract
+        run: python3 tools/spike/git_interface_contract.py
       - name: Test
         env:
           QSG_REQUIRE_SSH_KEYGEN: "1"

@@ -20,9 +20,12 @@
 | Parser bugs | SSHSIG and `allowed_signers` parsers read untrusted input | Strict parsing, property tests, and a cargo-fuzz target; not audited |
 | Supply chain | liboqs or crates compromised; tampered release binaries | Pinned versions, cargo-audit and cargo-deny, signed checksums |
 | Wrong identity | Principal not tied to commit author | Documented limitation |
+| Passphrase capture | A hostile process can observe terminal input or compromise the process | M5a prompts through the terminal without echo and never reads the passphrase from Git's stdin; prompt and shim code are not audited |
+| Git shim/parser failures | Git supplies paths, signatures, verify-time values, and signed data | M5a strictly accepts only Git's observed `-Y` calls, caps signatures at 128 KiB, allowed_signers/revocation input at 1 MiB, and signing/verification messages at 16 MiB; code is not audited |
 
 ## Mitigations currently implemented
 
 - `qsg-sshsig` rejects unsupported SSHSIG versions, namespaces, reserved/hash fields, key types, malformed lengths, trailing bytes, and oversized input. Property tests exercise arbitrary decoder input; a cargo-fuzz target is available, but no fuzz campaign has been run.
 - `qsg-keystore` encrypts the ML-DSA seed, bounds Argon2 parameters, authenticates its header, and enforces private Unix modes; this implementation has not been audited.
 - `qsg-trust` enforces exact principals, required Git namespace, bounded parsing, validity windows, and fingerprint revocation; this implementation has not been audited.
+- M5a `qsg-ssh-keygen` prompts for encrypted-key passphrases from the terminal, bounds verification input, rejects unsupported Git call shapes, and connects signature verification with trust checks; it has not been audited.

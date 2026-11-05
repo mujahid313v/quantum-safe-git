@@ -49,6 +49,8 @@ pub enum Error {
     InvalidPassphrase,
     #[error("passphrase-less storage requires allow_unencrypted=true")]
     UnencryptedNotAllowed,
+    #[error("encrypted key requires a passphrase")]
+    PassphraseRequired,
     #[error("unsupported key container version {0}")]
     UnsupportedVersion(u8),
     #[error("unsupported key algorithm id {0}")]
@@ -408,7 +410,7 @@ fn decode_container(
     let kind = if kdf == KDF_ARGON2ID {
         check_params(memory, iterations, lanes, bounds)?;
         if passphrase.is_none() {
-            return Err(Error::WrongPassphraseOrCorrupt);
+            return Err(Error::PassphraseRequired);
         }
         KeyKind::Encrypted
     } else {

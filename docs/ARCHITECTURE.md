@@ -1,6 +1,6 @@
 # Architecture
 
-**Status: design document. Experimental. No audit. Not for production use.** Almost nothing described here is implemented.
+**Status: evolving implementation and design document. M1–M5a library and executable work is present; M5b and later remain planned. Experimental, unaudited, and not for production use.**
 
 ## Idea
 
@@ -10,14 +10,14 @@ Git can delegate commit and tag signing to an external program (`gpg.format ssh`
 
 | Component | Role |
 |-----------|------|
-| `qsg-core` | ML-DSA-65 key generation, sign, verify. No file or network I/O. |
-| `qsg-sshsig` | Encode and decode the signature container ([SPEC.md](SPEC.md)). |
-| `qsg-keystore` | Key generation and encrypted private-key storage under `~/.config/qsgit/`. |
-| `qsg-trust` | Parse `allowed_signers`, validity windows, revocation list. |
-| `qsg-cli` (binary `qsg`) | User commands. |
-| `qsg-ssh-keygen` | Implements only the `-Y` calls Git makes. Links `qsg-core` directly; it does not run `qsg`. |
+| `qsg-core` | Implemented ML-DSA-65 key generation, sign, verify. No file or network I/O. |
+| `qsg-sshsig` | Implemented strict signature-container encoding and decoding ([SPEC.md](SPEC.md)). |
+| `qsg-keystore` | Implemented key generation and encrypted private-key storage. |
+| `qsg-trust` | Implemented `allowed_signers`, validity-window, and revocation parsing/helpers. |
+| `qsg-cli` (binary `qsg`) | M5a implements `keygen` and `pubkey`; remaining user commands are M5b. |
+| `qsg-ssh-keygen` | M5a implements Git's `-Y sign`, `find-principals`, and `verify` calls. |
 
-Crypto backend: TBD (ADR 0001): either the `oqs` crate on liboqs, or a pure-Rust ML-DSA implementation.
+Crypto backend: RustCrypto `ml-dsa` 0.1.2, selected in [ADR 0001](adr/0001-crypto-backend.md); it has not been independently audited.
 
 ## Flows
 

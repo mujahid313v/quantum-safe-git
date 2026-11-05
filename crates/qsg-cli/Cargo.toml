@@ -2,5 +2,13 @@
 name = "qsg"
 version = "0.1.0"
 edition = "2024"
+rust-version.workspace = true
 
 [dependencies]
+base64 = "=0.22.1"
+qsg-keystore = { path = "../qsg-keystore" }
+rpassword = "=7.5.4"
+zeroize = "=1.8.2"
+
+[dev-dependencies]
+tempfile = "=3.27.0"

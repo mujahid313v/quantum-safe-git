@@ -33,7 +33,7 @@ git config gpg.ssh.allowedSignersFile <file>
 - Verify output line accepted by Git: `Good "git" signature for <principal> with <KEYTYPE> key <fingerprint>`.
 - On failure the program exited 255 and printed a message on stdout; `git verify-commit` then exited 1 and showed the message.
 
-- `git verify-commit`, `git verify-tag`, `git log --show-signature` and `git merge --verify-signatures` each ran one find-principals call followed by one verify call.
+- For a trusted key, `git verify-commit`, `git verify-tag`, `git log --show-signature` and `git merge --verify-signatures` run one find-principals call followed by one verify call. If no principal is found, Git may use the `check-novalidate` fallback described in M5a.
 - The signature is stored in the commit's `gpgsig` header between `-----BEGIN SSH SIGNATURE-----` and `-----END SSH SIGNATURE-----`.
 
 - Git did not validate the blob: a dummy blob and a non-standard key type name in the "Good" line were accepted.
@@ -53,7 +53,7 @@ Observed behavior: Git formats the commit's epoch timestamp in the machine's loc
 - Whether Git requires the `-----BEGIN SSH SIGNATURE-----` prefix.
 - Whether stderr output from the program matters.
 
-- Whether `check-novalidate` or `-r` (revocation file) is ever used.
+- Whether `-r` (revocation file) is ever used.
 - M0 Git call shapes on Linux/macOS, and behavior on Git versions other than those listed above.
 
 ## Consequences for QSGit
@@ -63,3 +63,45 @@ Observed behavior: Git formats the commit's epoch timestamp in the machine's loc
 - The shim must print exactly the `Good "git" signature for ...` line on success.
 
 - M4 trust parsing treats Git's no-`Z` verify time as local civil time. When comparing it to a UTC validity date, callers must supply an explicit UTC offset.
+
+## M5a QSGit shim behavior
+
+The `qsg-ssh-keygen` executable now implements the three Git calls above. It accepts `-Y sign -n git -f <keyfile> <buffer>`, `-Y find-principals -f <allowed_signers> -s <sigfile> -Overify-time=<time>`, and `-Y verify -n git -f <allowed_signers> -I <principal> -s <sigfile> -Overify-time=<time>`. Both `-Overify-time=<time>` and `-O verify-time=<time>` are accepted. The find-principals call intentionally has no `-n`; the shim obtains and checks the namespace from the signature. Other subcommands, flags, positional arguments, non-Git namespaces, and ssh-agent `-U` calls fail with status 255. A `.pub` signing-key path resolves through `qsg-keystore` to the corresponding private key.
+
+The shim prompts for encrypted-key passphrases through the terminal, never Git's stdin. On success, verify prints `Good "git" signature for <principal> with MLDSA65 key <SHA256:fingerprint>`. No matching principal exits 255 and prints `No principal matched.`. The shim limits signature files to 128 KiB, `allowed_signers` and revocation files to 1 MiB, and both the signing buffer and verify stdin to 16 MiB. See [USER_GUIDE.md](USER_GUIDE.md) for CLI exit codes and revocation configuration.
+
+M5a end-to-end coverage runs a real signed commit and tag through Git, checks `git verify-commit`, `git verify-tag`, and `git log --show-signature`, then exercises tampering, an untrusted key, a validity window, and revocation. On Windows 11, Git 2.55.0.windows.5 and OpenSSH_for_Windows 9.5p2 (LibreSSL 3.8.2), the local tests passed. The passing Linux/macOS M5a CI run is recorded below.
+
+Rechecking the failure path found one additional Git call: if `find-principals` returns no principal, Git invokes `-Y check-novalidate -n git -s <sigfile>` before it reports verification failure. The M5a shim intentionally rejects this subcommand, as scoped, with status 255 and `unsupported -Y subcommand: check-novalidate`. A temporary untrusted-key Git run with this shim showed `git verify-commit` exits 1 and exposes that diagnostic on stderr; it does not display the `find-principals` message. Successful trusted verification still uses `find-principals` followed by `verify`. A direct real-OpenSSH probe with an Ed25519 signature and the signed message on stdin showed that `ssh-keygen -Y check-novalidate` prints `Good "git" signature with ED25519 key <fingerprint>` and exits 0 for a valid signature; for a tampered message it prints `Signature verification failed: incorrect signature` followed by `Could not verify signature.` and exits 255 (Windows reports `-1` through Python). With an untrusted Ed25519 key, real Git/OpenSSH printed a good cryptographic signature line followed by `No principal matched.` and exited 1. Implementing this command could change how Git flows handle untrusted signatures; TODO: verify in Git source before ever implementing it.
+
+The test uses a 2020 author date with a 2025 committer date and verifies against a window that includes only the latter; verification succeeds. It then signs a tag with a 2025 tagger date pointing at a commit dated 2020; tag verification also succeeds. Therefore Git's `-Overify-time` uses the **committer date for commits** and the **tagger date for tags** in the tested Git 2.55.0.windows.5 setup. Git formats both in the verifier machine's local zone without `Z`. The shim resolves local civil time to UTC only when a matching trust entry has a UTC validity boundary; details and DST behavior are in [ADR 0003](adr/0003-local-time-offset.md) and [TRUST-MODEL.md](TRUST-MODEL.md).
+
+### OpenSSH failure comparison
+
+The following baseline was observed with Git 2.55.0.windows.5 and OpenSSH_for_Windows 9.5p2 (LibreSSL 3.8.2) using Ed25519 keys. QSGit behavior is from the M5a Git end-to-end test on Windows 11. Windows exposes native status 255 as signed `-1` in Python/subprocess output.
+
+| Failure case | Our shim through Git | Real `ssh-keygen` through Git with Ed25519 |
+|---|---|---|
+| Tampered signature/message | Git verify exits 1; shim reports `Could not verify signature.` / `Signature verification failed: incorrect signature`. **VERIFIED: Git 2.55.0.windows.5, Windows 11.** | **Not compared through Git.** Direct OpenSSH `check-novalidate` probe as above. |
+| Key not in allowed_signers | Git verify exits 1; stderr shows `unsupported -Y subcommand: check-novalidate` (no stdout). **VERIFIED: Git 2.55.0.windows.5, Windows 11.** | **Not compared through Git.** Real Git/OpenSSH untrusted-key behavior is described above, but no failure-matrix run was done. |
+| Expired key | Git verify exits 1; the end-to-end test observes the shim's `unsupported -Y subcommand: check-novalidate` diagnostic. **VERIFIED: Git 2.55.0.windows.5, Windows 11.** | **Not compared through Git.** |
+| Revoked key | Git verify exits 1; shim reports `revoked` in the verification failure. **VERIFIED: Git 2.55.0.windows.5, Windows 11.** | **Not compared through Git.** |
+| Wrong namespace | Direct shim call rejects with status 255 and a namespace error. **Not compared through Git.** | **Not compared through Git.** Git uses namespace `git` for these operations, so this row needs an explicit probe to be verified. |
+
+Ed25519 keys are used only to establish stock OpenSSH behavior; QSGit's shim intentionally supports its ML-DSA-65 key type. These are message-shape comparisons, not cryptographic interoperability between the algorithms.
+
+### M0 Git interface contract CI probe
+
+`tools/spike/git_interface_contract.py` runs as a normal Ubuntu/macOS CI step. The passing run was Git 2.56.0 on Ubuntu `Linux 7.0.0-1017-azure` (x86_64), OpenSSH_9.6p1 Ubuntu-3ubuntu13.20; and Git 2.56.0 on macOS `Darwin 25.6.0` (arm64), OpenSSH_10.5p1. Both contract steps and workspace tests passed.
+
+The exact call shapes observed on both platforms were:
+
+| Operation | Arguments passed to the program | Message source |
+|---|---|---|
+| Sign | `-Y sign -n git -f <keyfile> <bufferfile>` | No stdin (0 bytes); `<bufferfile>` exists and is a temporary Git signing buffer. Git writes the program's `<bufferfile>.sig` output into the commit/tag. |
+| Find principals | `-Y find-principals -f <allowed_signers> -s <signature> -Overify-time=<YYYYMMDDHHMMSS>` | No stdin (0 bytes); Git passes no `-n`. |
+| Verify | `-Y verify -n git -f <allowed_signers> -I <principal> -s <signature> -Overify-time=<YYYYMMDDHHMMSS>` | Signed message arrives on stdin (non-empty). |
+
+Git uses the compact `-Overify-time=` spelling without a `Z`. The probe exercised commit signing/verification, log signature display, tag signing/verification, merge and pull with `--verify-signatures`, and `fsck`. On both platforms Git stored a non-armor signature written by the fake signer during `git commit -S`, but `git verify-commit` rejected it before calling the program with exit 128 and `fatal: bad/incompatible signature`. A syntactically armored test signature then verified successfully. The fake program wrote `M0 stderr probe` to stderr: Git suppressed it for signing, log display, merge, pull, and fsck; it surfaced it during `verify-commit` and `verify-tag`. Every successful operation retained exit 0, so this stderr did not change Git's success decision. `fsck` did not invoke the SSH signing program. No `check-novalidate` or `-r` appeared in the trusted-signature CI flows.
+
+**Remaining M0 scope:** the CI probe above uses trusted signatures. A Windows untrusted-key `git verify-commit` run has independently confirmed that Git invokes `-Y check-novalidate`; the shim rejects it. CI has not exercised untrusted/expired cases for `verify-tag`, `log --show-signature`, `merge --verify-signatures`, or `pull --verify-signatures`, nor tested `-r` with `gpg.ssh.revocationFile` configured. These items remain **UNVERIFIED**; issue #50 stays open.

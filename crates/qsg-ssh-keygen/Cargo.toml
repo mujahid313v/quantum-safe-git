@@ -2,5 +2,16 @@
 name = "qsg-ssh-keygen"
 version = "0.1.0"
 edition = "2024"
+rust-version.workspace = true
 
 [dependencies]
+qsg-keystore = { path = "../qsg-keystore" }
+qsg-sshsig = { path = "../qsg-sshsig" }
+qsg-trust = { path = "../qsg-trust" }
+rpassword = "=7.5.4"
+time = { version = "=0.3.44", default-features = false, features = ["local-offset"] }
+zeroize = "=1.8.2"
+
+[dev-dependencies]
+base64 = "=0.22.1"
+tempfile = "=3.27.0"
