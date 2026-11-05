@@ -82,6 +82,15 @@ fn success_all(output: Output) -> String {
     )
 }
 
+fn report_failure(label: &str, output: &Output) {
+    println!(
+        "D7 {label}: exit={:?}; stdout={:?}; stderr={:?}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 struct Setup {
     temp: TempDir,
     repo: PathBuf,
@@ -237,6 +246,7 @@ fn git_commit_tag_and_verification_failures_work_end_to_end() {
         ],
     ));
     let tampered = git(repo, &["verify-commit", "HEAD"]);
+    report_failure("tampered commit (QSG shim)", &tampered);
     assert!(!tampered.status.success());
     assert!(
         format!(
@@ -257,6 +267,7 @@ fn git_commit_tag_and_verification_failures_work_end_to_end() {
         &["commit", "--allow-empty", "-S", "-m", "untrusted key"],
     ));
     let untrusted = git(repo, &["verify-commit", "HEAD"]);
+    report_failure("untrusted key (QSG shim)", &untrusted);
     assert!(!untrusted.status.success());
     assert!(
         format!(
@@ -292,6 +303,7 @@ fn git_commit_tag_and_verification_failures_work_end_to_end() {
         Some("2025-01-01T00:00:00+0000"),
     ));
     let expired = git(repo, &["verify-commit", "HEAD"]);
+    report_failure("expired key (QSG shim)", &expired);
     assert!(!expired.status.success());
     assert!(
         format!(
@@ -311,6 +323,7 @@ fn git_commit_tag_and_verification_failures_work_end_to_end() {
     .unwrap();
     fs::write(setup.temp.path().join("revoked_keys"), format!("{fp}\n")).unwrap();
     let revoked = git(repo, &["verify-commit", "HEAD"]);
+    report_failure("revoked sibling file (QSG shim)", &revoked);
     assert!(!revoked.status.success());
     assert!(
         format!(
@@ -330,6 +343,7 @@ fn git_commit_tag_and_verification_failures_work_end_to_end() {
         None,
         Some(&external_revocations),
     );
+    report_failure("revoked QSG_REVOKED_KEYS (QSG shim)", &revoked);
     assert!(!revoked.status.success());
     assert!(
         format!(

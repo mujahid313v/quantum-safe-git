@@ -53,8 +53,8 @@ Observed behavior: Git formats the commit's epoch timestamp in the machine's loc
 - Whether Git requires the `-----BEGIN SSH SIGNATURE-----` prefix.
 - Whether stderr output from the program matters.
 
-- Whether `-r` (revocation file) is ever used.
-- M0 Git call shapes on Linux/macOS, and behavior on Git versions other than those listed above.
+- Untrusted and expired signature call flows for every verification command on Linux/macOS.
+- Git's `gpg.ssh.revocationFile` argument behavior on Linux/macOS and Git versions other than those listed above.
 
 ## Consequences for QSGit
 - `qsg-ssh-keygen` implements only `sign`, `find-principals` and `verify`; any other `-Y` subcommand exits non-zero with a clear message.
@@ -104,4 +104,26 @@ The exact call shapes observed on both platforms were:
 
 Git uses the compact `-Overify-time=` spelling without a `Z`. The probe exercised commit signing/verification, log signature display, tag signing/verification, merge and pull with `--verify-signatures`, and `fsck`. On both platforms Git stored a non-armor signature written by the fake signer during `git commit -S`, but `git verify-commit` rejected it before calling the program with exit 128 and `fatal: bad/incompatible signature`. A syntactically armored test signature then verified successfully. The fake program wrote `M0 stderr probe` to stderr: Git suppressed it for signing, log display, merge, pull, and fsck; it surfaced it during `verify-commit` and `verify-tag`. Every successful operation retained exit 0, so this stderr did not change Git's success decision. `fsck` did not invoke the SSH signing program. No `check-novalidate` or `-r` appeared in the trusted-signature CI flows.
 
-**Remaining M0 scope:** the CI probe above uses trusted signatures. A Windows untrusted-key `git verify-commit` run has independently confirmed that Git invokes `-Y check-novalidate`; the shim rejects it. CI has not exercised untrusted/expired cases for `verify-tag`, `log --show-signature`, `merge --verify-signatures`, or `pull --verify-signatures`, nor tested `-r` with `gpg.ssh.revocationFile` configured. These items remain **UNVERIFIED**; issue #50 stays open.
+### M0/D7 closeout probes (partial)
+
+The CI contract probe was extended to configure `gpg.ssh.revocationFile` and log every call. The probe is skipped only when Python, Git, or `ssh-keygen` is missing locally; CI sets `QSG_REQUIRE_SSH_KEYGEN=1`. On Windows 11 with Git 2.55.0.windows.5, the trusted-signature flows below made no call containing `-r` despite the configured `gpg.ssh.revocationFile`. For each successful verification flow, Git called `find-principals` and then `verify`; it did not call `check-novalidate`. The same CI probe runs on Ubuntu and macOS and logs full arguments, but those matrix outcomes are not part of this local Windows result.
+
+| Git operation | Trusted key: calls observed | Untrusted key | Expired key |
+|---|---|---|---|
+| `git verify-commit` | `find-principals`, `verify`; no `-r` | Windows actual-shim probe: `find-principals`, then `check-novalidate` (shim rejects); **not verified** in cross-platform matrix | Actual-shim test: fails closed; exact call sequence in Git not captured; **not verified** in cross-platform matrix |
+| `git verify-tag` | `find-principals`, `verify`; no `-r` | **TODO: verify** | **TODO: verify** |
+| `git log --show-signature -1` | `find-principals`, `verify`; no `-r` | **TODO: verify** | **TODO: verify** |
+| `git merge --verify-signatures` | `find-principals`, `verify`; no `-r` | **TODO: verify** | **TODO: verify** |
+| `git pull --verify-signatures` (local remote) | `find-principals`, `verify`; no `-r` | **TODO: verify** | **TODO: verify** |
+
+The evidence above is from Git 2.55.0.windows.5 on Windows 11. It does not establish behavior on Linux/macOS or other Git versions. The trusted-call probe with `gpg.ssh.revocationFile` configured observed no `-r`; the previous CI trusted-flow probe on Git 2.56.0 also observed no `-r` (without the config option). The expanded multi-state matrix remains **UNVERIFIED**.
+
+| D7 Git verification failure | QSGit shim through Git | Stock OpenSSH Ed25519 through Git |
+|---|---|---|
+| Tampered commit | Git exit 1; stderr: `Could not verify signature.` then `Signature verification failed: incorrect signature` (**VERIFIED**, Windows 11, Git 2.55.0.windows.5) | **TODO: verify** |
+| Key absent from `allowed_signers` | Git exit 1; stderr: `unsupported -Y subcommand: check-novalidate` (**VERIFIED**, Windows 11, Git 2.55.0.windows.5) | **TODO: verify** |
+| Expired key (`valid-before` before `GIT_COMMITTER_DATE`) | Git exit 1; stderr: `unsupported -Y subcommand: check-novalidate` (**VERIFIED**, Windows 11, Git 2.55.0.windows.5) | **TODO: verify** |
+| Revoked key | Both `QSG_REVOKED_KEYS` and sibling `revoked_keys`: Git exit 1; stderr begins `Could not verify signature.` then `key is revoked: <fingerprint>` (**VERIFIED**, Windows 11, Git 2.55.0.windows.5) | **TODO: verify** |
+| Wrong namespace | Not reproducible through Git, which requests namespace `git`; source guard confirmed, but a crafted wrong-namespace signature test remains **TODO: verify** | Not reproducible through Git |
+
+For the QSGit shim today, direct invocation with `-Y verify -r <file> -n git` exits 255 and prints `unsupported flag -r`. The current Git probes do not show Git passing `-r` for `gpg.ssh.revocationFile`; the shim does not read that Git config option. It instead reads `QSG_REVOKED_KEYS` or a sibling `revoked_keys` file. See the security note in [TRUST-MODEL.md](TRUST-MODEL.md). M0/D7 is not complete until the outstanding matrix cells above are verified.

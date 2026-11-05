@@ -10,7 +10,7 @@ An earlier prototype (Dilithium-3, pre-standard parameters) lives on the `legacy
 
 | Item | Status |
 |------|--------|
-| M0: Git SSH-signing interface spike | Verified on Windows (Git 2.55, OpenSSH 10.5); CI experiments on Linux/macOS documented. See [docs/GIT-INTERFACE.md](docs/GIT-INTERFACE.md) |
+| M0: Git SSH-signing interface spike | Partial: trusted call shapes verified on Windows and Linux/macOS; failure and trust-state matrix remains open. See [docs/GIT-INTERFACE.md](docs/GIT-INTERFACE.md) |
 | M1–M4 libraries | Implemented; review and security audit pending |
 | M5a: `qsg keygen`, `qsg pubkey`, Git SSH-signing shim | Implemented; Windows end-to-end checked locally; Linux/macOS CI pending |
 | M5b: trust/verify/verify-range/doctor commands | Planned |
@@ -47,7 +47,7 @@ Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The list of what is out o
 
 | Milestone | Scope | Status |
 |-----------|-------|--------|
-| M0 | Repo cleanup and Git-interface spike | Windows spike done; cleanup in progress; Linux/macOS re-run pending |
+| M0 | Repo cleanup and Git-interface spike | Partial: trusted call shapes verified on Windows/Linux/macOS; untrusted/expired cross-command matrix remains open |
 | M1 | ML-DSA-65 core (backend chosen by ADR) | Implemented on `m1/core-mldsa`; review pending |
 | M2 | SSHSIG-style format and spec, test vectors | Implemented on `m2/sshsig`; OpenSSH interoperability verified on Windows, Ubuntu, and macOS CI |
 | M3 | Encrypted key storage | Implemented on `m3/keystore`; review pending |

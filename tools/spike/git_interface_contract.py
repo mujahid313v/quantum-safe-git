@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -24,6 +25,13 @@ def run(args, *, cwd=None, env=None, check=True):
 
 
 def main():
+    missing = [tool for tool in ("git", "ssh-keygen") if shutil.which(tool) is None]
+    if missing:
+        message = f"skipped M0 Git interface contract: missing {', '.join(missing)}"
+        if os.environ.get("QSG_REQUIRE_SSH_KEYGEN") == "1":
+            raise RuntimeError(f"{message} while QSG_REQUIRE_SSH_KEYGEN=1")
+        print(message, flush=True)
+        return
     git_version = run(["git", "--version"]).stdout.strip()
     print(
         f"Git={git_version}; OS={platform.system()} {platform.release()}; "
@@ -64,6 +72,7 @@ def main():
             ("gpg.format", "ssh"),
             ("gpg.ssh.program", str(wrapper)),
             ("gpg.ssh.allowedSignersFile", str(root / "allowed_signers")),
+            ("gpg.ssh.revocationFile", str(root / "revoked_keys")),
             ("user.signingkey", str(root / "dummy-key")),
             ("commit.gpgsign", "true"),
         ):
@@ -145,6 +154,7 @@ def main():
             ("gpg.format", "ssh"),
             ("gpg.ssh.program", str(wrapper)),
             ("gpg.ssh.allowedSignersFile", str(root / "allowed_signers")),
+            ("gpg.ssh.revocationFile", str(root / "revoked_keys")),
             ("user.signingkey", str(root / "dummy-key")),
         ):
             run(["git", "config", key, value], cwd=clone)
