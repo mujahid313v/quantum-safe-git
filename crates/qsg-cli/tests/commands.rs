@@ -3,6 +3,13 @@ use std::process::Command;
 #[test]
 fn keygen_prints_setup_instructions_and_pubkey_reads_the_result() {
     let dir = tempfile::tempdir().unwrap();
+    // tempfile follows the process umask; the keystore requires a 0700 key
+    // directory on Unix, so make the fixture satisfy that production policy.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    }
     let output = Command::new(env!("CARGO_BIN_EXE_qsg"))
         .args(["keygen", "--name", "test-key", "--dir"])
         .arg(dir.path())
