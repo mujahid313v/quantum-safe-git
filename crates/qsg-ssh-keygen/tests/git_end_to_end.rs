@@ -94,6 +94,11 @@ fn setup() -> Setup {
     let temp = tempfile::tempdir().unwrap();
     let keys = temp.path().join("keys");
     fs::create_dir(&keys).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&keys, fs::Permissions::from_mode(0o700)).unwrap();
+    }
     let first = generate(&keys, "first", None, "test key", false, true).unwrap();
     let second = generate(&keys, "second", None, "other key", false, true).unwrap();
     let first_key = qsg_keystore::read_public(&first.public_path).unwrap();
