@@ -59,7 +59,7 @@ git verify-tag v0.1.0
 git log --show-signature -1
 ```
 
-The shim accepts Git's `sign`, `find-principals`, and `verify` calls. Verification reads at most 16 MiB from stdin. Signature files are limited to 128 KiB and `allowed_signers` to 1 MiB. Successful verification prints Git's required `Good "git" signature ...` line. Errors exit 255; the `qsg` CLI exits 0 on success, 1 on an operation failure, and 2 for usage/configuration errors.
+The shim accepts Git's `sign`, `find-principals`, and `verify` calls. It reads at most 16 MiB from the signing buffer and from verification stdin. Signature files are limited to 128 KiB and `allowed_signers` to 1 MiB. Successful verification prints Git's required `Good "git" signature ...` line. Shim errors exit 255. The `qsg` CLI exits 0 on success, 1 on any runtime failure (including configuration and key-file failures), and 2 only for usage or argument errors.
 
 The shim looks for revocations in `QSG_REVOKED_KEYS` when set. Otherwise, it reads `revoked_keys` next to `allowed_signers` if that file exists. Git does not provide a revocation-file argument to the custom shim.
 

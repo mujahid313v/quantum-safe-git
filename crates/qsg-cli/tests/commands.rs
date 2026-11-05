@@ -9,8 +9,9 @@ fn keygen_prints_setup_instructions_and_pubkey_reads_the_result() {
         .args(["--comment", "M5a test", "--no-passphrase"])
         .output()
         .unwrap();
-    assert!(
-        output.status.success(),
+    assert_eq!(
+        output.status.code(),
+        Some(0),
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
@@ -56,4 +57,18 @@ fn keygen_prints_setup_instructions_and_pubkey_reads_the_result() {
         .output()
         .unwrap();
     assert_eq!(usage.status.code(), Some(2));
+
+    let runtime_config = Command::new(env!("CARGO_BIN_EXE_qsg"))
+        .args(["keygen", "--name", "../invalid", "--dir"])
+        .arg(dir.path())
+        .arg("--no-passphrase")
+        .output()
+        .unwrap();
+    assert_eq!(runtime_config.status.code(), Some(1));
+
+    let help = Command::new(env!("CARGO_BIN_EXE_qsg"))
+        .arg("help")
+        .output()
+        .unwrap();
+    assert_eq!(help.status.code(), Some(0));
 }
