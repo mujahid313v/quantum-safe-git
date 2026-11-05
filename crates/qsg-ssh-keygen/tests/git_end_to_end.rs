@@ -173,6 +173,25 @@ fn git_commit_tag_and_verification_failures_work_end_to_end() {
 
     success(git(repo, &["commit", "-S", "-m", "signed commit"]));
     let first_pub = qsg_keystore::read_public(setup.temp.path().join("keys/first.pub")).unwrap();
+    let git_revocations = setup.temp.path().join("gpg-revocations");
+    fs::write(&git_revocations, format!("{}\n", first_pub.fingerprint)).unwrap();
+    success(git(
+        repo,
+        &[
+            "config",
+            "gpg.ssh.revocationFile",
+            git_revocations.to_str().unwrap(),
+        ],
+    ));
+    let rejected_r = git(repo, &["verify-commit", "HEAD"]);
+    report_failure("gpg.ssh.revocationFile with QSG shim", &rejected_r);
+    assert!(!rejected_r.status.success());
+    assert!(
+        String::from_utf8_lossy(&rejected_r.stderr).contains("unsupported flag -r"),
+        "shim -r output: {}",
+        String::from_utf8_lossy(&rejected_r.stderr)
+    );
+    success(git(repo, &["config", "--unset", "gpg.ssh.revocationFile"]));
     fs::write(&setup.allowed, format!("{PRINCIPAL} namespaces=\"git\",valid-after=20240101Z,valid-before=20260101Z ssh-mldsa65@qsgit {}\n", base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &first_pub.blob))).unwrap();
     // The 2020 author date is outside the window; the 2025 committer date is inside.
     success(git_with_dates(
@@ -352,5 +371,107 @@ fn git_commit_tag_and_verification_failures_work_end_to_end() {
             String::from_utf8_lossy(&revoked.stderr)
         )
         .contains("revoked")
+    );
+}
+
+#[test]
+fn git_openssh_revocation_file_blocks_revoked_ed25519_key() {
+    if !tool_exists("git") || !tool_exists("ssh-keygen") {
+        let message = "skipped OpenSSH Git revocation test: git or ssh-keygen is missing";
+        if std::env::var("QSG_REQUIRE_SSH_KEYGEN").as_deref() == Ok("1") {
+            panic!("{message} while QSG_REQUIRE_SSH_KEYGEN=1");
+        }
+        eprintln!("{message}");
+        return;
+    }
+
+    let temp = tempfile::tempdir().unwrap();
+    let repo = temp.path().join("repo");
+    fs::create_dir(&repo).unwrap();
+    success(git(&repo, &["init", "-q"]));
+    let key = temp.path().join("ed25519");
+    let generated = Command::new("ssh-keygen")
+        .args(["-q", "-t", "ed25519", "-N", ""])
+        .arg("-f")
+        .arg(&key)
+        .output()
+        .expect("run ssh-keygen");
+    assert!(
+        generated.status.success(),
+        "ssh-keygen key generation failed: {}",
+        String::from_utf8_lossy(&generated.stderr)
+    );
+    let public_line = fs::read_to_string(key.with_extension("pub")).unwrap();
+    let allowed = temp.path().join("allowed_signers");
+    fs::write(
+        &allowed,
+        format!("{PRINCIPAL} namespaces=\"git\" {public_line}"),
+    )
+    .unwrap();
+    for (name, value) in [
+        ("user.name", "QSGit test"),
+        ("user.email", PRINCIPAL),
+        ("gpg.format", "ssh"),
+        ("gpg.ssh.program", "ssh-keygen"),
+    ] {
+        success(git(&repo, &["config", name, value]));
+    }
+    success(git(
+        &repo,
+        &["config", "user.signingkey", key.to_str().unwrap()],
+    ));
+    success(git(
+        &repo,
+        &[
+            "config",
+            "gpg.ssh.allowedSignersFile",
+            allowed.to_str().unwrap(),
+        ],
+    ));
+    fs::write(repo.join("file.txt"), "Ed25519 revocation test\n").unwrap();
+    success(git(&repo, &["add", "file.txt"]));
+    success(git(&repo, &["commit", "-S", "-m", "Ed25519 signed commit"]));
+
+    let revocations = temp.path().join("revoked.krl");
+    let created_krl = Command::new("ssh-keygen")
+        .args(["-q", "-k", "-f"])
+        .arg(&revocations)
+        .arg(key.with_extension("pub"))
+        .output()
+        .expect("create OpenSSH KRL");
+    assert!(
+        created_krl.status.success(),
+        "ssh-keygen KRL generation failed: {}",
+        String::from_utf8_lossy(&created_krl.stderr)
+    );
+    assert!(fs::metadata(&revocations).unwrap().len() > 0);
+    let krl_query = Command::new("ssh-keygen")
+        .args(["-Q", "-f"])
+        .arg(&revocations)
+        .arg(key.with_extension("pub"))
+        .output()
+        .expect("query OpenSSH KRL");
+    assert!(
+        !krl_query.status.success(),
+        "the generated KRL does not revoke the Ed25519 public key"
+    );
+    success(git(
+        &repo,
+        &[
+            "config",
+            "gpg.ssh.revocationFile",
+            revocations.to_str().unwrap(),
+        ],
+    ));
+    let result = git(&repo, &["verify-commit", "HEAD"]);
+    println!(
+        "D7 OpenSSH Ed25519 revoked key: exit={:?}; stdout={:?}; stderr={:?}",
+        result.status.code(),
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(
+        !result.status.success(),
+        "Git accepted an Ed25519 key independently confirmed as revoked by ssh-keygen -Q"
     );
 }

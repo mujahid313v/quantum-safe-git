@@ -80,6 +80,8 @@ def main():
         (root / "allowed_signers").write_text(
             f'{PRINCIPAL} namespaces="git" ssh-ed25519 AAAA\n', encoding="ascii"
         )
+        revoked_file = root / "revoked_keys"
+        revoked_file.write_text("nonempty revocation probe\n", encoding="ascii")
         (root / "dummy-key").write_text("ignored by fake signer\n", encoding="ascii")
         (repo / "file.txt").write_text("signed content\n", encoding="ascii")
         run(["git", "add", "file.txt"], cwd=repo)
@@ -174,10 +176,15 @@ def main():
         modes = [call["args"][call["args"].index("-Y") + 1] for call in calls]
         assert {"sign", "find-principals", "verify"}.issubset(set(modes)), modes
         assert "check-novalidate" not in modes, modes
-        assert all("-r" not in call["args"] for call in calls), calls
         signs = [call for call in calls if "sign" in call["args"]]
         finds = [call for call in calls if "find-principals" in call["args"]]
         verifies = [call for call in calls if "verify" in call["args"]]
+        assert all("-r" not in call["args"] for call in finds), finds
+        assert all(
+            "-r" in call["args"]
+            and call["args"][call["args"].index("-r") + 1] == str(revoked_file)
+            for call in verifies
+        ), verifies
         assert all(call["stdin_bytes"] == 0 for call in signs), signs
         assert all(call["buffer_exists"] for call in signs), signs
         assert all(call["stdin_bytes"] > 0 for call in verifies), verifies
@@ -190,7 +197,7 @@ def main():
         assert all(any(arg.startswith("-Overify-time=") for arg in call["args"]) for call in finds + verifies)
         print("Git commit accepted and stored non-armor output; verify-commit rejected it as bad/incompatible.")
         print("Successful Git operations tolerated program stderr (M0 stderr probe).")
-        print("No check-novalidate or -r observed in these trusted-signature flows.")
+        print("Trusted calls used find-principals then verify; Git added -r only to verify because the configured file exists.")
 
 
 if __name__ == "__main__":

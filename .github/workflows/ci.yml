@@ -33,6 +33,10 @@ jobs:
         env:
           QSG_REQUIRE_SSH_KEYGEN: "1"
         run: python3 tools/spike/git_interface_contract.py
+      - name: Git trusted and untrusted call matrix
+        env:
+          QSG_REQUIRE_SSH_KEYGEN: "1"
+        run: python3 tools/spike/git_call_state_matrix.py
       - name: Test
         env:
           QSG_REQUIRE_SSH_KEYGEN: "1"
