@@ -51,6 +51,8 @@ Observed behavior: Git formats the commit's epoch timestamp in the machine's loc
 
 ## Not verified
 
+- Exact exit codes and messages of the QSGit shim through Git on Ubuntu and macOS: CI runs `cargo test` without `--nocapture`, so only a non-zero exit and message substrings are asserted there. Exact values were observed on Windows only.
+- Whether the real-OpenSSH KRL revocation case fails for the right reason on every OS: that test has no baseline "verify succeeds before the KRL is configured" check yet (tracked in a follow-up issue).
 - Git 2.34 and versions other than Git 2.55.0 and 2.56.0.
 - Stock OpenSSH wrong-namespace verification through Git using a crafted external signature. The non-reproducibility claim is an inference from Git's normal `git` namespace flow, not a reproduced test; that D7 cell is marked **UNVERIFIED** below.
 
