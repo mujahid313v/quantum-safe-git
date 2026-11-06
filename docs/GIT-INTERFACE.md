@@ -104,7 +104,7 @@ The CI contract probe creates a non-empty revocation file and logs arguments; it
 | `git merge --verify-signatures` | `find-principals`, `verify` (**A:** calls and exit 0; **L:** success output) | `find-principals`, `check-novalidate` (**A:** calls and nonzero; **L:** exit 128/fatal) | Same calls (**A:** calls and nonzero; **L:** exit 128/fatal) |
 | `git pull --verify-signatures` (local remote) | `find-principals`, `verify` (**A:** calls and exit 0; **L:** success output) | `find-principals`, `check-novalidate` (**A:** calls and nonzero; **L:** exit 128/fatal) | Same calls (**A:** calls and nonzero; **L:** exit 128/fatal) |
 
-The state matrix did not configure a revocation file, so no `-r` appears in those calls. Git appends `-r <file>` only to a principal-matched `verify` call when the configured file exists; it omits `-r` if the file is absent and on the no-principal `check-novalidate` path.
+The state matrix did not configure a revocation file and asserts that no logged invocation contains `-r` (**A**). Git appends `-r <file>` only to a principal-matched `verify` call when the configured file exists; it omits `-r` if the file is absent and on the no-principal `check-novalidate` path.
 
 The state call matrix uses real Ed25519 signatures with real `ssh-keygen`, and the Python wrapper logs every argument before executing OpenSSH. All cells below were **VERIFIED** in CI on Git 2.56.0, Ubuntu `Linux 7.0.0-1017-azure` with OpenSSH_9.6p1 Ubuntu-3ubuntu13.20 and macOS `Darwin 25.6.0` with OpenSSH_10.3p1. The Windows 11/Git 2.55.0.windows.5 trusted probe with an existing non-empty file also observed `-r <file>` on each `verify` call, and no `-r` on `find-principals`. The earlier local probe's file did not exist, so its “no `-r`” conclusion was incorrect.
 
@@ -122,6 +122,8 @@ The call-matrix assertions in `tools/spike/git_call_state_matrix.py` include:
 expected = ["find-principals", "verify"] if state == "trusted" else ["find-principals", "check-novalidate"]
 if modes != expected:
     raise AssertionError(f"{state}/{operation}: expected {expected}, got {modes}; calls={calls}")
+if any("-r" in call for call in calls):
+    raise AssertionError(f"{state}/{operation}: unexpected -r without revocation config: {calls}")
 if state == "trusted" and result.returncode != 0:
     raise AssertionError(f"trusted {operation} failed: {result.stderr}")
 if state != "trusted" and operation != "log --show-signature" and result.returncode == 0:
