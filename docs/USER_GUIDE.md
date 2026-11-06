@@ -1,10 +1,10 @@
 # User guide
 
-**M5a status: key generation and Git commit/tag signing work on the tested Windows setup. Linux/macOS CI verification is pending. Experimental, unaudited, and not for production use.**
+**M5a status: key generation and Git commit/tag signing tests pass on Windows and Linux/macOS CI. Experimental, unaudited, and not for production use.**
 
 ## Requirements
 
-- Git 2.34 or newer with SSH signing support.
+- Tested with Git 2.55.0 on Windows and Git 2.56.0 on Ubuntu and macOS. Git 2.34 is the first version with SSH signing, but is untested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
 - Linux or macOS are the v0.1 target platforms. Windows development works, but is not a release target yet.
 - Rust 1.87 or newer to build from source.
 
@@ -61,7 +61,11 @@ git log --show-signature -1
 
 The shim accepts Git's `sign`, `find-principals`, and `verify` calls. It reads at most 16 MiB from the signing buffer and from verification stdin. Signature files are limited to 128 KiB and `allowed_signers` to 1 MiB. Successful verification prints Git's required `Good "git" signature ...` line. Shim errors exit 255. The `qsg` CLI exits 0 on success, 1 on any runtime failure (including configuration and key-file failures), and 2 only for usage or argument errors.
 
-The shim looks for revocations in `QSG_REVOKED_KEYS` when set. Otherwise, it reads `revoked_keys` next to `allowed_signers` if that file exists. Git does not provide a revocation-file argument to the custom shim.
+The shim looks for revocations in `QSG_REVOKED_KEYS` when set. Otherwise, it reads `revoked_keys` next to `allowed_signers` if that file exists.
+
+### Revocation troubleshooting
+
+Do not set `gpg.ssh.revocationFile` when using QSGit. Git passes `-r <file>` to `-Y verify` only when the setting is present, the file exists, and a principal was found. QSGit's shim rejects `-r` with exit 255 and `unsupported flag -r`, so Git verification fails closed. Use `QSG_REVOKED_KEYS` or a `revoked_keys` file next to `allowed_signers`. This is a deliberate v0.1 limitation; support for passing a QSGit revocation list via `-r` may be added later.
 
 ## Still planned for M5b
 

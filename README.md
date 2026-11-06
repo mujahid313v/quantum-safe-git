@@ -10,15 +10,17 @@ An earlier prototype (Dilithium-3, pre-standard parameters) lives on the `legacy
 
 | Item | Status |
 |------|--------|
-| M0: Git SSH-signing interface spike | Verified on Windows (Git 2.55, OpenSSH 10.5); CI experiments on Linux/macOS documented. See [docs/GIT-INTERFACE.md](docs/GIT-INTERFACE.md) |
+| M0: Git SSH-signing interface spike | All reproducible call/failure cells verified on Windows, Ubuntu, and macOS; Git 2.34 remains untested. See [docs/GIT-INTERFACE.md](docs/GIT-INTERFACE.md) |
 | M1–M4 libraries | Implemented; review and security audit pending |
-| M5a: `qsg keygen`, `qsg pubkey`, Git SSH-signing shim | Implemented; Windows end-to-end checked locally; Linux/macOS CI pending |
+| M5a: `qsg keygen`, `qsg pubkey`, Git SSH-signing shim | Implemented; end-to-end tests pass on Windows and Linux/macOS CI |
 | M5b: trust/verify/verify-range/doctor commands | Planned |
 | M6–M8 | Planned |
 
-M1–M4 library functionality is implemented. M5a adds key generation, public-key display, and a Git signing/verifying shim; its end-to-end test passes locally on Windows. Linux/macOS CI confirmation is pending for this integration.
+M1–M4 library functionality is implemented. M5a adds key generation, public-key display, and a Git signing/verifying shim; its end-to-end tests pass on Windows and Linux/macOS CI.
 
 ## M5a workflow
+
+Git compatibility tested with Git 2.55.0 on Windows and Git 2.56.0 on Ubuntu and macOS. Git 2.34 is the first release with SSH signing, but has not been tested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
 
 ```bash
 qsg keygen                                   # create an ML-DSA-65 key pair
@@ -47,12 +49,12 @@ Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The list of what is out o
 
 | Milestone | Scope | Status |
 |-----------|-------|--------|
-| M0 | Repo cleanup and Git-interface spike | Windows spike done; cleanup in progress; Linux/macOS re-run pending |
+| M0 | Repo cleanup and Git-interface spike | Partial: trusted call shapes verified on Windows/Linux/macOS; untrusted/expired cross-command matrix remains open |
 | M1 | ML-DSA-65 core (backend chosen by ADR) | Implemented on `m1/core-mldsa`; review pending |
 | M2 | SSHSIG-style format and spec, test vectors | Implemented on `m2/sshsig`; OpenSSH interoperability verified on Windows, Ubuntu, and macOS CI |
 | M3 | Encrypted key storage | Implemented on `m3/keystore`; review pending |
 | M4 | allowed_signers parsing, validity, revocation | Implemented on `m4/trust`; review pending |
-| M5a | `qsg keygen`, `qsg pubkey`, and `qsg-ssh-keygen` Git shim | Implemented; Windows end-to-end checked locally; Linux/macOS CI pending |
+| M5a | `qsg keygen`, `qsg pubkey`, and `qsg-ssh-keygen` Git shim | Implemented; end-to-end tests pass on Windows and Linux/macOS CI |
 | M5b | `trust`, `verify`, `verify-range`, and `doctor` CLI commands | Planned |
 | M6 | End-to-end tests and CI | Planned |
 | M7 | Documentation and security pass | Planned |
