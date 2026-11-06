@@ -126,10 +126,39 @@ if any("-r" in call for call in calls):
     raise AssertionError(f"{state}/{operation}: unexpected -r without revocation config: {calls}")
 if state == "trusted" and result.returncode != 0:
     raise AssertionError(f"trusted {operation} failed: {result.stderr}")
+visible = result.stdout + result.stderr
+if state == "trusted":
+    expected_text = "good GPG signature" if operation.startswith(("merge", "pull")) else 'Good "git" signature'
+    if expected_text not in visible:
+        raise AssertionError(f"trusted {operation}: expected {expected_text!r}: {visible!r}")
 if state != "trusted" and operation != "log --show-signature" and result.returncode == 0:
     raise AssertionError(f"untrusted/expired {operation} unexpectedly succeeded")
-if result.returncode == 0 or not has_revocation_arg:
+if state != "trusted":
+    expected_code = 0 if operation == "log --show-signature" else (128 if operation.startswith(("merge", "pull")) else 1)
+    if result.returncode != expected_code:
+        raise AssertionError(f"{state}/{operation}: expected exit {expected_code}, got {result.returncode}")
+    if operation.startswith(("merge", "pull")):
+        expected_text = "untrusted GPG signature"
+    else:
+        expected_text = "No principal matched."
+    if expected_text not in visible:
+        raise AssertionError(f"{state}/{operation}: expected {expected_text!r}: {visible!r}")
+    if state == "expired" and operation not in ("merge --verify-signatures", "pull --verify-signatures"):
+        if "key has expired" not in visible:
+            raise AssertionError(f"expired/{operation}: missing expiry diagnostic: {visible!r}")
+```
+
+The same script asserts tamper and KRL outcomes and prints the exact exit/output tuple for each case:
+
+```python
+if result.returncode != 1 or modes != ["find-principals", "verify"]:
+    raise AssertionError(f"tampered Ed25519 commit result/calls invalid: {result}, {calls}")
+if "Could not verify signature." not in result.stderr or "Signature verification failed: incorrect signature" not in result.stderr:
+    raise AssertionError(f"tampered Ed25519 commit diagnostics changed: {result.stderr!r}")
+if result.returncode != 1 or not has_revocation_arg:
     raise AssertionError(f"revocation-file verification failed to fail closed: {result}, {calls}")
+if "Could not verify signature." not in result.stderr:
+    raise AssertionError(f"revoked-key verification diagnostic changed: {result.stderr!r}")
 ```
 
 The QSG shim tests in `crates/qsg-ssh-keygen/tests/git_end_to_end.rs` assert revocation and namespace rejection:
