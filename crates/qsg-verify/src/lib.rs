@@ -52,13 +52,28 @@ pub fn find_principals(
         time_text,
         offset,
     )?;
-    let principals = allowed
-        .find_principals(&record.public_key, &record.namespace, time, offset)
-        .map_err(|e| e.to_string())?;
+    let principals = find_principals_record(&allowed, &record, time, offset)?;
     if principals.is_empty() {
         return Err("No principal matched.".into());
     }
     Ok(principals)
+}
+
+/// Find allowed principals for a decoded SSHSIG record.
+pub fn find_principals_record(
+    allowed: &AllowedSigners,
+    record: &qsg_sshsig::SshSignature,
+    time: qsg_trust::VerifyTime,
+    offset: Option<UtcOffset>,
+) -> Result<Vec<String>, String> {
+    allowed
+        .find_principals(&record.public_key, &record.namespace, time, offset)
+        .map_err(|e| e.to_string())
+}
+
+/// Parse an allowed-signers file with the same limit and parser used by the shim.
+pub fn read_allowed(path: &Path) -> Result<AllowedSigners, String> {
+    load_allowed(path)
 }
 
 /// Verify a signature over supplied bytes against trust, validity, and revocation policy.
@@ -72,6 +87,27 @@ pub fn verify_message(
     offset: Result<Option<UtcOffset>, String>,
 ) -> Result<String, VerifyFailure> {
     let record = load_signature(sig_path).map_err(VerifyFailure::from)?;
+    verify_record_message(
+        allowed_path,
+        principal,
+        &record,
+        time_text,
+        message,
+        offset,
+        None,
+    )
+}
+
+/// Verify an already-decoded record. Used by standalone object verification.
+pub fn verify_record_message(
+    allowed_path: &Path,
+    principal: &str,
+    record: &qsg_sshsig::SshSignature,
+    time_text: &str,
+    message: impl Read,
+    offset: Result<Option<UtcOffset>, String>,
+    revoked_path: Option<&Path>,
+) -> Result<String, VerifyFailure> {
     if record.namespace != "git" {
         return Err(VerifyFailure::from(
             "signature namespace does not match -n git".to_owned(),
@@ -80,7 +116,7 @@ pub fn verify_message(
     let time = parse_verify_time(time_text)
         .map_err(|e| VerifyFailure::from(format!("invalid verify-time: {e}")))?;
     let allowed = load_allowed(allowed_path).map_err(VerifyFailure::from)?;
-    let revocations = load_revocations(allowed_path).map_err(VerifyFailure::from)?;
+    let revocations = load_revocations(allowed_path, revoked_path).map_err(VerifyFailure::from)?;
     let offset = offset_if_needed(
         &allowed,
         &record.public_key,
@@ -110,6 +146,13 @@ pub fn verify_message(
     fingerprint(&record.public_key).map_err(|e| VerifyFailure::from(e.to_string()))
 }
 
+/// Decode a bounded canonical SSHSIG armor block.
+pub fn decode_signature(bytes: &[u8]) -> Result<qsg_sshsig::SshSignature, String> {
+    let text = std::str::from_utf8(bytes).map_err(|_| "signature armor is not UTF-8")?;
+    let blob = decode_armor(text).map_err(|e| format!("invalid signature armor: {e}"))?;
+    decode_blob(&blob).map_err(|e| format!("invalid signature: {e}"))
+}
+
 fn load_signature(path: &Path) -> Result<qsg_sshsig::SshSignature, String> {
     let bytes = read_limited(
         fs::File::open(path).map_err(|e| format!("could not read signature file: {e}"))?,
@@ -131,15 +174,19 @@ fn load_allowed(path: &Path) -> Result<AllowedSigners, String> {
     parse_allowed_signers(text).map_err(|e| e.to_string())
 }
 
-fn load_revocations(allowed_path: &Path) -> Result<Revocations, String> {
-    let configured = std::env::var_os("QSG_REVOKED_KEYS");
-    let path = match &configured {
-        Some(value) => PathBuf::from(value),
-        None => allowed_path
+fn load_revocations(
+    allowed_path: &Path,
+    override_path: Option<&Path>,
+) -> Result<Revocations, String> {
+    let configured = override_path
+        .map(Path::to_path_buf)
+        .or_else(|| std::env::var_os("QSG_REVOKED_KEYS").map(PathBuf::from));
+    let path = configured.as_ref().cloned().unwrap_or_else(|| {
+        allowed_path
             .parent()
             .unwrap_or(Path::new("."))
-            .join("revoked_keys"),
-    };
+            .join("revoked_keys")
+    });
     if configured.is_none() && !path.exists() {
         return Ok(Revocations::default());
     }
