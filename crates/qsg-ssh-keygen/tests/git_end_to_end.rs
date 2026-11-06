@@ -525,7 +525,15 @@ fn shim_rejects_a_crafted_non_git_namespace_signature() {
         .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-    child.stdin.take().unwrap().write_all(message).unwrap();
+    // The shim reads and rejects the signature before reading stdin. On Unix,
+    // the child can exit early enough for the pipe write to see BrokenPipe.
+    if let Err(error) = child.stdin.take().unwrap().write_all(message) {
+        assert_eq!(
+            error.kind(),
+            std::io::ErrorKind::BrokenPipe,
+            "unexpected error writing the verification message: {error}"
+        );
+    }
     let output = child.wait_with_output().unwrap();
     println!(
         "D7 wrong namespace (direct shim): exit={:?}; stdout={:?}; stderr={:?}",
