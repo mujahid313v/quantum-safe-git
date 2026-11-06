@@ -259,7 +259,7 @@ fn verify_signed_objects_times_and_failure_reasons() {
             "--allowed-signers",
             setup.allowed.to_str().unwrap(),
             "--verify-time",
-            "20200101000000Z",
+            "20200101000000",
             "--commit",
             &base,
         ],
