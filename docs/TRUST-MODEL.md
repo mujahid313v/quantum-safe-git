@@ -27,6 +27,12 @@ The parser accepts LF and CRLF, skips blank lines and lines beginning with `#`, 
 - CI must take `allowed_signers` from the base branch or from pipeline configuration, never from the pull request being checked. Otherwise an attacker adds their own key in the same pull request and signs with it.
 - Locally, protect the file like any other trust anchor.
 
+`qsg trust add <principal> <pubkey-file>` appends a QSGit ML-DSA public key with the `git` namespace; optional validity windows can be supplied with `--valid-after` and `--valid-before`. `qsg trust list` shows principals, fingerprints, windows, and skipped non-QSGit key types. `qsg trust revoke <fingerprint>` appends to the plain fingerprint revocation list. These commands preserve unrelated text and comments, reject duplicates, and atomically replace the edited file. Revoking a key rejects all of its signatures, including old ones.
+
+For `qsg verify` and `qsg verify-range`, revocation source precedence is explicit `--revoked-keys`, then `QSG_REVOKED_KEYS`, then `revoked_keys` alongside `--allowed-signers`. A missing or malformed explicitly chosen file fails closed. CI must obtain the allowed-signers bytes from the base branch or trusted pipeline configuration; the verify-range safeguard compares the actual file with tracked base/head blobs but cannot establish provenance for external or untracked files.
+
+The CI example in [USER_GUIDE.md](USER_GUIDE.md) uses `git show <base>:<path>` to materialize the base-branch trust file before invoking `qsg verify-range`.
+
 ## Validity windows and time
 
 Git passes `-Overify-time=YYYYMMDDHHMMSS` derived from the commit's timestamp. The M4 logging-wrapper experiment verified that Git formats this value in the machine's local time, independently of the commit's recorded UTC offset, and does not append `Z`. This was tested locally on Windows with Git 2.55.0.windows.5 and in CI on Linux and macOS with Git 2.56.0; on both Unix systems it was tested under UTC, Asia/Kolkata, and America/Los_Angeles. The timestamp is still chosen by the commit author: a stolen key can backdate signed commits into a validity window. Validity windows limit honest mistakes, not a determined attacker with the key.

@@ -18,7 +18,7 @@ Please do not open public issues for vulnerabilities.
 
 ## What is implemented
 
-Nothing security-relevant yet. The cryptographic code does not exist. Items in the docs are design goals unless a document says "verified".
+Implemented security-relevant functionality includes ML-DSA-65 key generation/sign/verify, SSHSIG encoding, encrypted key storage, allowed-signers validity and revocation checks, the Git signing shim, standalone verification, range verification, trust-file editing, and read-only diagnostics. These implementations are experimental and have not been independently audited; see the threat and trust models for implemented controls and limitations.
 
 ## Further reading
 

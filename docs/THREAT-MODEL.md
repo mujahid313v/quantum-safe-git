@@ -23,6 +23,9 @@
 | Passphrase capture | A hostile process can observe terminal input or compromise the process | M5a prompts through the terminal without echo and never reads the passphrase from Git's stdin; prompt and shim code are not audited |
 | Git shim/parser failures | Git supplies paths, signatures, verify-time values, and signed data | M5a strictly accepts only Git's observed `-Y` calls, caps signatures at 128 KiB, allowed_signers/revocation input at 1 MiB, and signing/verification messages at 16 MiB; code is not audited |
 | Misconfigured Git revocation file | Git may pass `-r <file>` to the custom verifier | M5a rejects `-r` with exit 255, so verification fails closed. Do not set `gpg.ssh.revocationFile` with QSGit; use `QSG_REVOKED_KEYS` or sibling `revoked_keys`. Deliberate v0.1 limitation; support for a QSGit list via `-r` may be added later. |
+| Allowed-signers file editor | Malicious principal/key/date input or interrupted replacement | M5b validates through `qsg-trust`, bounds inputs, preserves unrelated lines, rejects duplicates, and writes a same-directory synced temporary file before rename; not audited. |
+| Trust-file substitution in verify-range | A change supplies its own trusted key file | M5b compares the bytes actually used against tracked base/head blobs and fails closed on a difference unless explicitly overridden; external/untracked files remain caller-controlled; not audited. |
+| Incomplete history or empty range in CI | A shallow clone or incorrect base can omit commits | M5b fails unresolved/missing objects closed and offers `--fail-on-empty`; root commits are not included when used as the exclusive range base; not audited. |
 
 ## Mitigations currently implemented
 
@@ -30,3 +33,4 @@
 - `qsg-keystore` encrypts the ML-DSA seed, bounds Argon2 parameters, authenticates its header, and enforces private Unix modes; this implementation has not been audited.
 - `qsg-trust` enforces exact principals, required Git namespace, bounded parsing, validity windows, and fingerprint revocation; this implementation has not been audited.
 - M5a `qsg-ssh-keygen` prompts for encrypted-key passphrases from the terminal, bounds verification input, rejects unsupported Git call shapes, and connects signature verification with trust checks; it has not been audited.
+- M5b `qsg verify`, `verify-range`, `trust`, and `doctor` reuse the shared verification and trust parsers; the file editor and range trust-source safeguard have not been audited.
