@@ -48,7 +48,7 @@ mod parity_tests {
         let fp = qsg_sshsig::fingerprint(&record.public_key).unwrap();
         let allowed = repo.join("allowed_signers");
         let public_blob = record.public_key.as_slice();
-        let encoded = base64::engine::general_purpose::STANDARD.encode(&public_blob);
+        let encoded = base64::engine::general_purpose::STANDARD.encode(public_blob);
         fs::write(
             &allowed,
             format!("parity@example.test namespaces=\"git\" ssh-mldsa65@qsgit {encoded}\n"),
