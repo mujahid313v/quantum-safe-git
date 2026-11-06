@@ -43,8 +43,9 @@ mod parity_tests {
         success(git(repo, &["config", "user.name", "Parity Test"]));
         success(git(repo, &["config", "user.email", "parity@example.test"]));
         let signature = repo.join("fixture.sshsig");
-        fs::write(&signature, FIXTURE).unwrap();
-        let record = qsg_verify::decode_signature(FIXTURE).unwrap();
+        let armor = qsg_sshsig::encode_armor(FIXTURE).unwrap();
+        fs::write(&signature, armor).unwrap();
+        let record = qsg_sshsig::decode_blob(FIXTURE).unwrap();
         let fp = qsg_sshsig::fingerprint(&record.public_key).unwrap();
         let allowed = repo.join("allowed_signers");
         let public_blob = record.public_key.as_slice();
