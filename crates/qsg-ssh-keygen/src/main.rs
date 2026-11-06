@@ -1,19 +1,14 @@
 #![forbid(unsafe_code)]
 
 use qsg_keystore::{KeyKind, Passphrase};
-use qsg_sshsig::{decode_armor, decode_blob, fingerprint, sign_ml_dsa65, verify_ml_dsa65};
-use qsg_trust::{
-    AllowedSigners, Revocations, TimeBasis, UtcOffset, parse_allowed_signers, parse_verify_time,
-};
+use qsg_sshsig::sign_ml_dsa65;
+use qsg_trust::{UtcOffset, parse_verify_time};
 use std::env;
 use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
-use time::{Date, Month, OffsetDateTime, UtcOffset as TimeOffset};
 use zeroize::Zeroize;
 
-const MAX_SIGNATURE: u64 = 128 * 1024;
-const MAX_ALLOWED_SIGNERS: u64 = 1024 * 1024;
 const MAX_MESSAGE: u64 = 16 * 1024 * 1024;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -47,7 +42,7 @@ fn main() {
             Command::Find { verify_time, .. } | Command::Verify { verify_time, .. } => {
                 parse_verify_time(verify_time)
                     .map_err(|e| format!("invalid verify-time: {e}"))
-                    .and_then(system_local_offset)
+                    .and_then(qsg_verify::system_local_offset)
             }
             Command::Sign { .. } => Ok(None),
         };
@@ -237,26 +232,7 @@ fn find(
     time_text: &str,
     offset: Result<Option<UtcOffset>, String>,
 ) -> Result<(), String> {
-    let record = load_signature(sig_path)?;
-    if record.namespace != "git" {
-        return Err("signature namespace is not git".into());
-    }
-    let time = parse_verify_time(time_text).map_err(|e| format!("invalid verify-time: {e}"))?;
-    let allowed = load_allowed(allowed_path)?;
-    let offset = offset_if_needed(
-        &allowed,
-        &record.public_key,
-        None,
-        &record.namespace,
-        time_text,
-        offset,
-    )?;
-    let principals = allowed
-        .find_principals(&record.public_key, &record.namespace, time, offset)
-        .map_err(|e| e.to_string())?;
-    if principals.is_empty() {
-        return Err("No principal matched.".into());
-    }
+    let principals = qsg_verify::find_principals(allowed_path, sig_path, time_text, offset)?;
     for p in principals {
         println!("{p}");
     }
@@ -270,187 +246,22 @@ fn verify(
     time_text: &str,
     offset: Result<Option<UtcOffset>, String>,
 ) -> Result<(), String> {
-    let record = load_signature(sig_path)?;
-    if record.namespace != "git" {
-        return Err("signature namespace does not match -n git".into());
-    }
-    let time = parse_verify_time(time_text).map_err(|e| format!("invalid verify-time: {e}"))?;
-    let allowed = load_allowed(allowed_path)?;
-    let revocations = load_revocations(allowed_path)?;
-    let offset = offset_if_needed(
-        &allowed,
-        &record.public_key,
-        Some(principal),
-        "git",
+    let fp = qsg_verify::verify_message(
+        allowed_path,
+        principal,
+        sig_path,
         time_text,
+        io::stdin(),
         offset,
-    )?;
-    let _trusted = allowed
-        .check(
-            principal,
-            &record.public_key,
-            "git",
-            time,
-            offset,
-            &revocations,
-        )
-        .map_err(|e| format!("Could not verify signature.\n{e}"))?;
-    let message = read_limited(io::stdin(), MAX_MESSAGE as usize, "signed message")?;
-    if verify_ml_dsa65(&record, &message).is_err() {
-        println!("Could not verify signature.");
-        return Err("Signature verification failed: incorrect signature".into());
-    }
-    let fp = fingerprint(&record.public_key).map_err(|e| e.to_string())?;
+    )
+    .map_err(|failure| {
+        if let Some(output) = failure.stdout_message {
+            println!("{output}");
+        }
+        failure.message
+    })?;
     println!("Good \"git\" signature for {principal} with MLDSA65 key {fp}");
     Ok(())
-}
-
-fn load_signature(path: &Path) -> Result<qsg_sshsig::SshSignature, String> {
-    let bytes = read_limited(
-        fs::File::open(path).map_err(|e| format!("could not read signature file: {e}"))?,
-        MAX_SIGNATURE as usize,
-        "signature file",
-    )?;
-    let text = std::str::from_utf8(&bytes).map_err(|_| "signature armor is not UTF-8")?;
-    let blob = decode_armor(text).map_err(|e| format!("invalid signature armor: {e}"))?;
-    decode_blob(&blob).map_err(|e| format!("invalid signature: {e}"))
-}
-
-fn load_allowed(path: &Path) -> Result<AllowedSigners, String> {
-    let bytes = read_limited(
-        fs::File::open(path).map_err(|e| format!("could not read allowed_signers: {e}"))?,
-        MAX_ALLOWED_SIGNERS as usize,
-        "allowed_signers",
-    )?;
-    let text = std::str::from_utf8(&bytes).map_err(|_| "allowed_signers is not UTF-8")?;
-    parse_allowed_signers(text).map_err(|e| e.to_string())
-}
-
-fn load_revocations(allowed_path: &Path) -> Result<Revocations, String> {
-    let path = match env::var_os("QSG_REVOKED_KEYS") {
-        Some(value) => PathBuf::from(value),
-        None => allowed_path
-            .parent()
-            .unwrap_or(Path::new("."))
-            .join("revoked_keys"),
-    };
-    if env::var_os("QSG_REVOKED_KEYS").is_none() && !path.exists() {
-        return Ok(Revocations::default());
-    }
-    let bytes = read_limited(
-        fs::File::open(&path).map_err(|e| format!("could not read revocation file: {e}"))?,
-        MAX_ALLOWED_SIGNERS as usize,
-        "revocation file",
-    )?;
-    let text = std::str::from_utf8(&bytes).map_err(|_| "revocation file is not UTF-8")?;
-    Revocations::parse(text).map_err(|e| e.to_string())
-}
-
-fn offset_if_needed(
-    allowed: &AllowedSigners,
-    key: &[u8],
-    principal: Option<&str>,
-    namespace: &str,
-    time_text: &str,
-    offset: Result<Option<UtcOffset>, String>,
-) -> Result<Option<UtcOffset>, String> {
-    let parsed = parse_verify_time(time_text).map_err(|e| e.to_string())?;
-    let mismatch = allowed.entries.iter().any(|entry| {
-        entry.key_blob == key
-            && entry.namespaces.iter().any(|n| n == namespace)
-            && principal.is_none_or(|p| entry.principals.iter().any(|v| v == p))
-            && [entry.valid_after, entry.valid_before]
-                .into_iter()
-                .flatten()
-                .any(|bound| bound.basis != parsed.basis)
-    });
-    if !mismatch {
-        return Ok(None);
-    }
-    offset?
-        .ok_or_else(|| "machine UTC offset unavailable; UTC validity check failed closed".into())
-        .map(Some)
-}
-
-fn civil_seconds(c: qsg_trust::CivilDateTime) -> Result<i64, String> {
-    let month = Month::try_from(c.month).map_err(|_| "invalid verify-time month")?;
-    let date = Date::from_calendar_date(c.year as i32, month, c.day)
-        .map_err(|_| "invalid verify-time date")?;
-    let wall = date
-        .with_hms(c.hour, c.minute, c.second)
-        .map_err(|_| "invalid verify-time clock")?
-        .assume_utc();
-    Ok(wall.unix_timestamp())
-}
-
-fn local_civil_to_utc_seconds(
-    parsed: qsg_trust::VerifyTime,
-    offset: UtcOffset,
-) -> Result<i64, String> {
-    let wall_seconds = civil_seconds(parsed.civil)?;
-    if parsed.basis == TimeBasis::Utc {
-        return Ok(wall_seconds);
-    }
-    Ok(wall_seconds - i64::from(offset.minutes_east) * 60)
-}
-
-fn system_local_offset(parsed: qsg_trust::VerifyTime) -> Result<Option<UtcOffset>, String> {
-    let wall_seconds = civil_seconds(parsed.civil)?;
-    if parsed.basis == TimeBasis::Utc {
-        return offset_at(wall_seconds).map(Some);
-    }
-
-    // Solve local wall time = UTC instant + offset. Sampling nearby instants
-    // discovers candidate offsets across DST transitions without a tz database.
-    let mut candidates = std::collections::BTreeSet::new();
-    for hours in (-48..=48).step_by(3) {
-        let probe = wall_seconds + i64::from(hours) * 3600;
-        let candidate_offset = offset_at_seconds(probe)?;
-        if candidate_offset.whole_seconds() % 60 != 0 {
-            return Err(
-                "machine UTC offset is not minute-aligned; UTC validity check failed closed".into(),
-            );
-        }
-        let candidate_offset =
-            UtcOffset::new(candidate_offset.whole_minutes()).map_err(|e| e.to_string())?;
-        let utc_seconds = local_civil_to_utc_seconds(parsed, candidate_offset)?;
-        let actual = offset_at_seconds(utc_seconds)?;
-        if actual.whole_seconds() == i32::from(candidate_offset.minutes_east) * 60 {
-            candidates.insert(actual.whole_seconds());
-        }
-    }
-    if candidates.len() != 1 {
-        let reason = if candidates.is_empty() {
-            "does not map to a local machine time"
-        } else {
-            "is ambiguous during a daylight-saving transition"
-        };
-        return Err(format!(
-            "verify-time {reason}; UTC validity check failed closed"
-        ));
-    }
-    let minutes = i16::try_from(*candidates.first().expect("one candidate") / 60)
-        .map_err(|_| "machine UTC offset is out of range")?;
-    UtcOffset::new(minutes).map(Some).map_err(|e| e.to_string())
-}
-
-fn offset_at(seconds: i64) -> Result<UtcOffset, String> {
-    let offset = offset_at_seconds(seconds)?;
-    if offset.whole_seconds() % 60 != 0 {
-        return Err(
-            "machine UTC offset is not minute-aligned; UTC validity check failed closed".into(),
-        );
-    }
-    UtcOffset::new(offset.whole_minutes()).map_err(|e| e.to_string())
-}
-
-fn offset_at_seconds(seconds: i64) -> Result<TimeOffset, String> {
-    let instant =
-        OffsetDateTime::from_unix_timestamp(seconds).map_err(|_| "verify-time is out of range")?;
-    TimeOffset::local_offset_at(instant).map_err(|_| {
-        "cannot determine machine UTC offset for verify-time; UTC validity check failed closed"
-            .into()
-    })
 }
 
 fn read_limited(mut reader: impl Read, limit: usize, label: &str) -> Result<Vec<u8>, String> {
@@ -522,24 +333,6 @@ mod tests {
         ] {
             assert!(parse_args(&shape).is_err(), "accepted {shape:?}");
         }
-    }
-
-    #[test]
-    fn local_to_utc_conversion_uses_explicit_offsets_at_dst_boundaries() {
-        let before_spring = parse_verify_time("20250309013000").unwrap();
-        let after_spring = parse_verify_time("20250309033000").unwrap();
-        let spring_before = UtcOffset::new(-300).unwrap();
-        let spring_after = UtcOffset::new(-240).unwrap();
-        let before_utc = local_civil_to_utc_seconds(before_spring, spring_before).unwrap();
-        let after_utc = local_civil_to_utc_seconds(after_spring, spring_after).unwrap();
-        assert_eq!(after_utc - before_utc, 60 * 60);
-
-        // The repeated fall-back wall time maps to two possible UTC instants;
-        // Git's timestamp does not say which offset was intended.
-        let repeated = parse_verify_time("20251102013000").unwrap();
-        let daylight_utc = local_civil_to_utc_seconds(repeated, spring_after).unwrap();
-        let standard_utc = local_civil_to_utc_seconds(repeated, spring_before).unwrap();
-        assert_eq!(standard_utc - daylight_utc, 60 * 60);
     }
 
     #[test]

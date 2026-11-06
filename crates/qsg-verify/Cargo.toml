@@ -1,0 +1,11 @@
+[package]
+name = "qsg-verify"
+version = "0.1.0"
+edition = "2024"
+rust-version.workspace = true
+
+[dependencies]
+qsg-keystore = { path = "../qsg-keystore" }
+qsg-sshsig = { path = "../qsg-sshsig" }
+qsg-trust = { path = "../qsg-trust" }
+time = { version = "=0.3.44", default-features = false, features = ["local-offset"] }
