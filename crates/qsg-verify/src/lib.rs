@@ -137,7 +137,7 @@ pub fn verify_record_message(
         )
         .map_err(|e| VerifyFailure::from(format!("Could not verify signature.\n{e}")))?;
     let message = read_message(message).map_err(VerifyFailure::from)?;
-    if verify_ml_dsa65(&record, &message).is_err() {
+    if verify_ml_dsa65(record, &message).is_err() {
         return Err(VerifyFailure {
             message: "Signature verification failed: incorrect signature".into(),
             stdout_message: Some("Could not verify signature."),
