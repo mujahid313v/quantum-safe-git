@@ -20,6 +20,11 @@ fn key(dir: &Path, name: &str) -> (std::path::PathBuf, String) {
 #[test]
 fn trust_add_list_revoke_round_trip_preserves_text_and_permissions() {
     let temp = TempDir::new().unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(temp.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    }
     let keys = temp.path().join("keys");
     fs::create_dir(&keys).unwrap();
     #[cfg(unix)]
