@@ -57,10 +57,22 @@ mod parity_tests {
         .unwrap();
         let recorder = repo.join("qsg-recorder.sh");
         let capture = repo.join("git-payload.bin");
+        let good_line = repo.join("good-line.txt");
+        fs::write(
+            &good_line,
+            b"Good \"git\" signature for parity@example.test with test key SHA256:fixture\n",
+        )
+        .unwrap();
+        let principals_line = repo.join("principals.txt");
+        fs::write(&principals_line, b"parity@example.test\n").unwrap();
+        let recorder_log = repo.join("recorder-stdout.log");
         let script = format!(
-            "#!/bin/sh\nsig={}\ncapture={}\ncase \"$2\" in\n sign) cp \"$sig\" \"$7.sig\" ;;\n find-principals) printf 'parity@example.test\\n' ;;\n verify) cat > \"$capture\"; printf 'Good \\\"git\\\" signature for parity@example.test with test key SHA256:fixture\\n' ;;\n *) exit 2 ;;\nesac\n",
+            "#!/bin/sh\nsig={}\ncapture={}\ngood={}\nprincipals={}\nlog={}\ncase \"$2\" in\n sign) cp \"$sig\" \"$7.sig\" ;;\n find-principals) cat \"$principals\" ;;\n verify) cat > \"$capture\"; cat \"$good\" | tee \"$log\" ;;\n *) exit 2 ;;\nesac\n",
             shell_quote(signature.to_str().unwrap()),
-            shell_quote(capture.to_str().unwrap())
+            shell_quote(capture.to_str().unwrap()),
+            shell_quote(good_line.to_str().unwrap()),
+            shell_quote(principals_line.to_str().unwrap()),
+            shell_quote(recorder_log.to_str().unwrap()),
         );
         fs::write(&recorder, script).unwrap();
         use std::os::unix::fs::PermissionsExt;
@@ -74,12 +86,22 @@ mod parity_tests {
             success(git(repo, &["config", key, value]));
         }
         let mut case = 0usize;
-        let verify_head = |repo: &Path, capture: &Path| {
+        let verify_head = |repo: &Path, capture: &Path, log: &Path| {
             success(git(repo, &["verify-commit", "HEAD"]));
+            let captured = fs::read(capture).unwrap();
+            assert!(
+                !captured.is_empty(),
+                "recorder captured no payload from Git verify-commit"
+            );
+            assert_eq!(
+                fs::read(log).unwrap(),
+                b"Good \"git\" signature for parity@example.test with test key SHA256:fixture\n",
+                "recorder stdout does not match expected Good signature line"
+            );
             let raw = git_limited_in(repo, &["cat-file", "commit", "HEAD"], MAX_OBJECT).unwrap();
             let format = git_limited_in(repo, &["rev-parse", "--show-object-format"], 128).unwrap();
             let (_, extracted) = extract_commit(&raw, &format).unwrap();
-            assert_eq!(fs::read(capture).unwrap(), extracted);
+            assert_eq!(captured, extracted);
         };
         let commit = |message: &str| {
             fs::write(repo.join("file"), format!("{message}\n")).unwrap();
@@ -87,10 +109,10 @@ mod parity_tests {
             success(git(repo, &["commit", "-S", "-m", message]));
         };
         commit("signed commit");
-        verify_head(repo, &capture);
+        verify_head(repo, &capture, &recorder_log);
         case += 1;
         commit("message contains gpgsig");
-        verify_head(repo, &capture);
+        verify_head(repo, &capture, &recorder_log);
         case += 1;
 
         // A merge commit exercises multiple parent headers.
@@ -110,7 +132,7 @@ mod parity_tests {
             repo,
             &["merge", "--no-ff", "-S", "-m", "merge", "parity-side"],
         ));
-        verify_head(repo, &capture);
+        verify_head(repo, &capture, &recorder_log);
         case += 1;
 
         let tag_message = repo.join("tag-message.txt");
@@ -126,9 +148,19 @@ mod parity_tests {
             ],
         ));
         success(git(repo, &["verify-tag", "parity-tag"]));
+        let captured = fs::read(&capture).unwrap();
+        assert!(
+            !captured.is_empty(),
+            "recorder captured no payload from Git verify-tag"
+        );
+        assert_eq!(
+            fs::read(&recorder_log).unwrap(),
+            b"Good \"git\" signature for parity@example.test with test key SHA256:fixture\n",
+            "recorder stdout does not match expected Good signature line"
+        );
         let tag_raw = git_limited_in(repo, &["cat-file", "tag", "parity-tag"], MAX_OBJECT).unwrap();
         let (_, extracted_tag) = extract_tag(&tag_raw).unwrap();
-        assert_eq!(fs::read(&capture).unwrap(), extracted_tag);
+        assert_eq!(captured, extracted_tag);
         case += 1;
 
         fs::write(&tag_message, "fake block follows\n-----BEGIN SSH SIGNATURE-----\nZmFrZQ==\n-----END SSH SIGNATURE-----\nreal signature follows\n").unwrap();
@@ -143,11 +175,21 @@ mod parity_tests {
             ],
         ));
         success(git(repo, &["verify-tag", "parity-fake-tag"]));
+        let captured = fs::read(&capture).unwrap();
+        assert!(
+            !captured.is_empty(),
+            "recorder captured no payload from Git verify-tag (fake block)"
+        );
+        assert_eq!(
+            fs::read(&recorder_log).unwrap(),
+            b"Good \"git\" signature for parity@example.test with test key SHA256:fixture\n",
+            "recorder stdout does not match expected Good signature line"
+        );
         let raw =
             git_limited_in(repo, &["cat-file", "tag", "parity-fake-tag"], MAX_OBJECT).unwrap();
         let marker = locate_tag_signature(&raw).unwrap();
         let extracted = remove_tag_header_signatures(&raw[..marker]);
-        assert_eq!(fs::read(&capture).unwrap(), extracted);
+        assert_eq!(captured, extracted);
         case += 1;
 
         // Custom multiline headers use Git's continuation convention and stay
@@ -167,10 +209,20 @@ mod parity_tests {
         .trim()
         .to_owned();
         success(git(repo, &["verify-commit", &oid]));
+        let captured = fs::read(&capture).unwrap();
+        assert!(
+            !captured.is_empty(),
+            "recorder captured no payload from Git verify-commit (multiline headers)"
+        );
+        assert_eq!(
+            fs::read(&recorder_log).unwrap(),
+            b"Good \"git\" signature for parity@example.test with test key SHA256:fixture\n",
+            "recorder stdout does not match expected Good signature line"
+        );
         let raw = git_limited_in(repo, &["cat-file", "commit", &oid], MAX_OBJECT).unwrap();
         let format = git_limited_in(repo, &["rev-parse", "--show-object-format"], 128).unwrap();
         let (_, extracted) = extract_commit(&raw, &format).unwrap();
-        assert_eq!(fs::read(&capture).unwrap(), extracted);
+        assert_eq!(captured, extracted);
         case += 1;
 
         let sha = repo.join("sha256");
@@ -191,6 +243,16 @@ mod parity_tests {
             success(git(&sha, &["add", "file"]));
             success(git(&sha, &["commit", "-S", "-m", "sha256"]));
             success(git(&sha, &["verify-commit", "HEAD"]));
+            let captured = fs::read(&capture).unwrap();
+            assert!(
+                !captured.is_empty(),
+                "recorder captured no payload from sha256 Git verify-commit"
+            );
+            assert_eq!(
+                fs::read(&recorder_log).unwrap(),
+                b"Good \"git\" signature for parity@example.test with test key SHA256:fixture\n",
+                "recorder stdout does not match expected Good signature line"
+            );
             let raw = git_limited_in(&sha, &["cat-file", "commit", "HEAD"], MAX_OBJECT).unwrap();
             let format = git_limited_in(&sha, &["rev-parse", "--show-object-format"], 128).unwrap();
             assert!(
@@ -198,7 +260,7 @@ mod parity_tests {
                     .any(|w| w == b"gpgsig-sha256 ")
             );
             let (_, extracted) = extract_commit(&raw, &format).unwrap();
-            assert_eq!(fs::read(&capture).unwrap(), extracted);
+            assert_eq!(captured, extracted);
             case += 1;
         } else {
             eprintln!(

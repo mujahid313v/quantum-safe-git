@@ -22,6 +22,11 @@ fn trust_add_list_revoke_round_trip_preserves_text_and_permissions() {
     let temp = TempDir::new().unwrap();
     let keys = temp.path().join("keys");
     fs::create_dir(&keys).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&keys, fs::Permissions::from_mode(0o700)).unwrap();
+    }
     let (first, first_fp) = key(&keys, "first");
     let (second, _) = key(&keys, "second");
     let allowed = temp.path().join("allowed_signers");

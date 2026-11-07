@@ -34,6 +34,11 @@ fn setup() -> Setup {
     let temp = tempfile::tempdir().unwrap();
     let keys = temp.path().join("keys");
     fs::create_dir(&keys).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&keys, fs::Permissions::from_mode(0o700)).unwrap();
+    }
     let first = generate(&keys, "verify-one", None, "verify", false, true).unwrap();
     let second = generate(&keys, "verify-two", None, "verify", false, true).unwrap();
     let public = qsg_keystore::read_public(&first.public_path).unwrap();
@@ -543,12 +548,23 @@ fn verify_range_handles_json_failures_empty_ranges_and_trust_source() {
     );
     assert_eq!(json.status.code(), Some(0));
     assert!(String::from_utf8_lossy(&json.stdout).contains("\"schema_version\":1"));
-    if Command::new("python3").arg("--version").output().is_ok() {
+    let python_ok = Command::new("python3")
+        .args(["-c", "import json"])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+    if python_ok {
         let parsed = Command::new("python3").args(["-c", "import json,sys; d=json.load(sys.stdin); assert d['schema_version']==1 and len(d['commits'])==1"]).stdin(std::process::Stdio::piped()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::piped()).spawn();
         let mut child = parsed.unwrap();
         use std::io::Write;
         child.stdin.take().unwrap().write_all(&json.stdout).unwrap();
         assert!(child.wait().unwrap().success());
+    } else {
+        let msg = "skipped JSON validation: python3 import json probe failed";
+        if std::env::var("QSG_REQUIRE_SSH_KEYGEN").as_deref() == Ok("1") {
+            panic!("{msg} while QSG_REQUIRE_SSH_KEYGEN=1");
+        }
+        eprintln!("{msg}");
     }
 
     let empty = qsg(

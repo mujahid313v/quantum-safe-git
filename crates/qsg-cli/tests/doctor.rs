@@ -22,6 +22,11 @@ fn setup() -> Setup {
     fs::write(&global, "").unwrap();
     let keys = temp.path().join("keys");
     fs::create_dir(&keys).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&keys, fs::Permissions::from_mode(0o700)).unwrap();
+    }
     let key = generate(&keys, "doctor-key", None, "doctor", false, true).unwrap();
     let public = qsg_keystore::read_public(&key.public_path).unwrap();
     let allowed = temp.path().join("allowed_signers");
