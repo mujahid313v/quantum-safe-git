@@ -866,3 +866,451 @@ fn revision_option_injection_is_usage_error() {
         );
     }
 }
+
+// ── SHA-256 repository qsg verify/verify-range (issue #56) ───────────────────
+// Tests `qsg verify --commit`, `qsg verify --tag`, and `qsg verify-range`
+// inside a git SHA-256 object-format repository. Unix-only: sha256 object
+// format requires Unix-style git config isolation and is not tested on Windows.
+#[cfg(unix)]
+#[test]
+fn sha256_repository_qsg_verify_and_verify_range() {
+    if !tools_present() {
+        return;
+    }
+
+    let temp = tempfile::tempdir().unwrap();
+    let keys = temp.path().join("keys");
+    std::fs::create_dir(&keys).unwrap();
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&keys, std::fs::Permissions::from_mode(0o700)).unwrap();
+    }
+    let key_info = generate(&keys, "sha256key", None, "sha256-verify", false, true).unwrap();
+    let public = qsg_keystore::read_public(&key_info.public_path).unwrap();
+    let allowed = temp.path().join("allowed_signers");
+    std::fs::write(&allowed, allowed_line(&public.blob)).unwrap();
+
+    let repo = temp.path().join("repo256");
+    std::fs::create_dir(&repo).unwrap();
+
+    // Try sha256 init; skip if unsupported.
+    let init = Command::new("git")
+        .args(["init", "-q", "--object-format=sha256"])
+        .current_dir(&repo)
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", repo.join("global.gitconfig"))
+        .output()
+        .unwrap();
+    if !init.status.success() {
+        let msg = format!(
+            "skipped sha256 qsg verify test: {}",
+            String::from_utf8_lossy(&init.stderr)
+        );
+        if std::env::var("QSG_REQUIRE_SSH_KEYGEN").as_deref() == Ok("1") {
+            panic!("{msg} while QSG_REQUIRE_SSH_KEYGEN=1");
+        }
+        eprintln!("{msg}");
+        return;
+    }
+
+    // Helper: run git in the sha256 repo.
+    let git256 = |args: &[&str]| -> Output {
+        Command::new("git")
+            .args(args)
+            .current_dir(&repo)
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", repo.join("global.gitconfig"))
+            .env("GIT_AUTHOR_NAME", "Verify Test")
+            .env("GIT_AUTHOR_EMAIL", PRINCIPAL)
+            .env("GIT_COMMITTER_NAME", "Verify Test")
+            .env("GIT_COMMITTER_EMAIL", PRINCIPAL)
+            .env_remove("QSG_REVOKED_KEYS")
+            .output()
+            .unwrap()
+    };
+
+    for (k, v) in [
+        ("user.name", "Verify Test"),
+        ("user.email", PRINCIPAL),
+        ("gpg.format", "ssh"),
+        ("gpg.ssh.program", shim_path().to_str().unwrap()),
+        ("user.signingkey", key_info.private_path.to_str().unwrap()),
+        ("gpg.ssh.allowedSignersFile", allowed.to_str().unwrap()),
+    ] {
+        let out = git256(&["config", k, v]);
+        assert!(out.status.success(), "git config {k} failed");
+    }
+
+    // Signed commit in sha256 repo.
+    std::fs::write(repo.join("file.txt"), "sha256 content\n").unwrap();
+    let add = git256(&["add", "file.txt"]);
+    assert!(add.status.success());
+    let commit_out = git256(&["commit", "-S", "-m", "sha256 signed commit"]);
+    assert!(
+        commit_out.status.success(),
+        "signed commit failed: {}",
+        String::from_utf8_lossy(&commit_out.stderr)
+    );
+
+    // Assert gpgsig-sha256 header is used.
+    let cat = git256(&["cat-file", "-p", "HEAD"]);
+    assert!(cat.status.success());
+    assert!(
+        String::from_utf8_lossy(&cat.stdout).contains("gpgsig-sha256"),
+        "sha256 commit must use gpgsig-sha256 header"
+    );
+
+    // qsg verify --commit HEAD.
+    let verify_commit = qsg(
+        &repo,
+        &[
+            "verify",
+            "--commit",
+            "HEAD",
+            "--allowed-signers",
+            allowed.to_str().unwrap(),
+        ],
+    );
+    assert!(
+        verify_commit.status.success(),
+        "qsg verify --commit failed in sha256 repo: {}",
+        String::from_utf8_lossy(&verify_commit.stderr)
+    );
+
+    // Signed annotated tag.
+    let tag_out = git256(&["tag", "-s", "-m", "sha256 tag", "sha256-v0"]);
+    assert!(
+        tag_out.status.success(),
+        "signed tag failed: {}",
+        String::from_utf8_lossy(&tag_out.stderr)
+    );
+
+    // qsg verify --tag sha256-v0.
+    let verify_tag = qsg(
+        &repo,
+        &[
+            "verify",
+            "--tag",
+            "sha256-v0",
+            "--allowed-signers",
+            allowed.to_str().unwrap(),
+        ],
+    );
+    assert!(
+        verify_tag.status.success(),
+        "qsg verify --tag failed in sha256 repo: {}",
+        String::from_utf8_lossy(&verify_tag.stderr)
+    );
+
+    // verify-range: one signed commit, expect success.
+    let head_hex = {
+        let out = git256(&["rev-parse", "HEAD"]);
+        assert!(out.status.success());
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    };
+
+    // Add an unsigned commit for the failure case.
+    std::fs::write(repo.join("unsigned.txt"), "unsigned\n").unwrap();
+    let add2 = git256(&["add", "unsigned.txt"]);
+    assert!(add2.status.success());
+    let commit2 = git256(&["commit", "--no-gpg-sign", "-m", "unsigned commit"]);
+    assert!(commit2.status.success());
+
+    // verify-range over just the signed commit: success.
+    let range_pass = qsg(
+        &repo,
+        &[
+            "verify-range",
+            &format!("{head_hex}~1..{head_hex}"),
+            "--allowed-signers",
+            allowed.to_str().unwrap(),
+        ],
+    );
+    assert!(
+        range_pass.status.success(),
+        "verify-range over signed sha256 commit failed: {}",
+        String::from_utf8_lossy(&range_pass.stderr)
+    );
+
+    // verify-range including the unsigned commit: failure.
+    let new_head = {
+        let out = git256(&["rev-parse", "HEAD"]);
+        assert!(out.status.success());
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    };
+    let range_fail = qsg(
+        &repo,
+        &[
+            "verify-range",
+            &format!("{head_hex}..{new_head}"),
+            "--allowed-signers",
+            allowed.to_str().unwrap(),
+        ],
+    );
+    assert!(
+        !range_fail.status.success(),
+        "verify-range over unsigned sha256 commit must fail"
+    );
+    assert!(
+        String::from_utf8_lossy(&range_fail.stdout).contains("FAILED"),
+        "failure output must contain FAILED"
+    );
+}
+
+// ── Tampered annotated tag (issue #70) ───────────────────────────────────────
+// Two tamperings, each with its own passing baseline. Unix-only.
+#[cfg(unix)]
+#[test]
+fn tampered_annotated_tag_fails_qsg_verification() {
+    use std::io::Write;
+
+    if !tools_present() {
+        return;
+    }
+
+    let setup = setup();
+    let repo = &setup.repo;
+
+    // Initial signed commit.
+    git(repo, &["commit", "--allow-empty", "-S", "-m", "initial"]);
+
+    let make_signed_tag = |name: &str, message: &str| {
+        let out = Command::new("git")
+            .args(["tag", "-s", "-m", message, name])
+            .current_dir(repo)
+            .env("GIT_CONFIG_GLOBAL", repo.join("global.gitconfig"))
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("HOME", repo.parent().unwrap())
+            .env("GIT_AUTHOR_NAME", "Verify Test")
+            .env("GIT_AUTHOR_EMAIL", PRINCIPAL)
+            .env("GIT_COMMITTER_NAME", "Verify Test")
+            .env("GIT_COMMITTER_EMAIL", PRINCIPAL)
+            .env_remove("QSG_REVOKED_KEYS")
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "signed tag {name} failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    };
+
+    let cat_tag = |name: &str| -> Vec<u8> {
+        let out = Command::new("git")
+            .args(["cat-file", "tag", name])
+            .current_dir(repo)
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", repo.join("global.gitconfig"))
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "git cat-file tag {name} failed");
+        out.stdout
+    };
+
+    // Write a modified tag object; try plain then --literally.
+    let write_tag_object = |modified: &[u8]| -> Result<String, String> {
+        for literally in [false, true] {
+            let mut cmd = Command::new("git");
+            cmd.args(["hash-object", "-t", "tag", "-w", "--stdin"]);
+            if literally {
+                cmd.arg("--literally");
+            }
+            cmd.current_dir(repo)
+                .env("GIT_CONFIG_NOSYSTEM", "1")
+                .env("GIT_CONFIG_GLOBAL", repo.join("global.gitconfig"))
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped());
+            let mut child = cmd.spawn().expect("spawn git hash-object");
+            child.stdin.take().unwrap().write_all(modified).ok();
+            let out = child.wait_with_output().expect("wait hash-object");
+            if out.status.success() {
+                return Ok(String::from_utf8_lossy(&out.stdout).trim().to_string());
+            }
+            if literally {
+                return Err(format!(
+                    "hash-object rejected (plain and --literally): {}",
+                    String::from_utf8_lossy(&out.stderr)
+                ));
+            }
+        }
+        unreachable!()
+    };
+
+    let point_ref = |ref_name: &str, oid: &str| -> Result<(), String> {
+        let out = Command::new("git")
+            .args(["update-ref", ref_name, oid])
+            .current_dir(repo)
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", repo.join("global.gitconfig"))
+            .output()
+            .unwrap();
+        if out.status.success() {
+            Ok(())
+        } else {
+            Err(format!(
+                "update-ref failed: {}",
+                String::from_utf8_lossy(&out.stderr)
+            ))
+        }
+    };
+
+    // ── (a) Tamper the tag message ────────────────────────────────────────────
+    make_signed_tag("good-tag-a", "authentic message");
+
+    // Baseline (a): untouched tag verifies.
+    let baseline_a = qsg(
+        repo,
+        &[
+            "verify",
+            "--tag",
+            "good-tag-a",
+            "--allowed-signers",
+            setup.allowed.to_str().unwrap(),
+        ],
+    );
+    assert!(
+        baseline_a.status.success(),
+        "baseline (a): good-tag-a must verify: {}",
+        String::from_utf8_lossy(&baseline_a.stderr)
+    );
+
+    let raw_a = cat_tag("good-tag-a");
+    let raw_a_str = String::from_utf8_lossy(&raw_a).into_owned();
+    let body_start = raw_a_str.find("\n\n").map(|i| i + 2);
+    let tampered_a: Vec<u8> = if let Some(start) = body_start {
+        let mut t = raw_a.clone();
+        t[start] = if t[start] == b'a' { b'b' } else { b'a' };
+        t
+    } else {
+        panic!("(a) could not find message body in tag object");
+    };
+
+    match write_tag_object(&tampered_a) {
+        Ok(oid) => match point_ref("refs/tags/tampered-msg", &oid) {
+            Ok(()) => {
+                let result = qsg(
+                    repo,
+                    &[
+                        "verify",
+                        "--tag",
+                        "tampered-msg",
+                        "--allowed-signers",
+                        setup.allowed.to_str().unwrap(),
+                    ],
+                );
+                assert!(
+                    !result.status.success(),
+                    "(a) tampered-msg must NOT verify; got exit={:?}: {}",
+                    result.status.code(),
+                    String::from_utf8_lossy(&result.stdout)
+                );
+                let out = format!(
+                    "{}{}",
+                    String::from_utf8_lossy(&result.stdout),
+                    String::from_utf8_lossy(&result.stderr)
+                );
+                assert!(
+                    out.to_lowercase().contains("signature")
+                        || out.to_lowercase().contains("verify")
+                        || out.to_lowercase().contains("failed")
+                        || out.to_lowercase().contains("error"),
+                    "(a) rejection output must name the problem; got: {out}"
+                );
+            }
+            Err(e) => panic!("(a) update-ref failed after hash-object succeeded: {e}"),
+        },
+        Err(e) => panic!(
+            "(a) ALTERNATIVE NEEDED: git refused to store tampered tag: {e}\n\
+             The existing test verify_signed_objects_times_and_failure_reasons \
+             covers the same code path via tampered commit signatures."
+        ),
+    }
+
+    // ── (b) Tamper one base64 char in the signature armor ─────────────────────
+    make_signed_tag("good-tag-b", "tag for sig tampering");
+
+    // Baseline (b): untouched tag verifies.
+    let baseline_b = qsg(
+        repo,
+        &[
+            "verify",
+            "--tag",
+            "good-tag-b",
+            "--allowed-signers",
+            setup.allowed.to_str().unwrap(),
+        ],
+    );
+    assert!(
+        baseline_b.status.success(),
+        "baseline (b): good-tag-b must verify: {}",
+        String::from_utf8_lossy(&baseline_b.stderr)
+    );
+
+    let raw_b = cat_tag("good-tag-b");
+    let raw_b_str = String::from_utf8_lossy(&raw_b).into_owned();
+    let sig_start_marker = "-----BEGIN SSH SIGNATURE-----";
+    let tampered_b: Vec<u8> = if let Some(sig_start) = raw_b_str.find(sig_start_marker) {
+        let search_from = sig_start + sig_start_marker.len();
+        let base64_pos = raw_b_str[search_from..]
+            .bytes()
+            .position(|b| b.is_ascii_alphanumeric() || b == b'+' || b == b'/')
+            .map(|p| search_from + p);
+        if let Some(pos) = base64_pos {
+            let mut t = raw_b_str.into_bytes();
+            t[pos] = if t[pos].is_ascii_uppercase() {
+                t[pos].to_ascii_lowercase()
+            } else if t[pos].is_ascii_lowercase() {
+                t[pos].to_ascii_uppercase()
+            } else {
+                b'A'
+            };
+            t
+        } else {
+            panic!("(b) no base64 char found in signature armor");
+        }
+    } else {
+        panic!("(b) no SSH SIGNATURE armor found in tag object");
+    };
+
+    match write_tag_object(&tampered_b) {
+        Ok(oid) => match point_ref("refs/tags/tampered-sig", &oid) {
+            Ok(()) => {
+                let result = qsg(
+                    repo,
+                    &[
+                        "verify",
+                        "--tag",
+                        "tampered-sig",
+                        "--allowed-signers",
+                        setup.allowed.to_str().unwrap(),
+                    ],
+                );
+                assert!(
+                    !result.status.success(),
+                    "(b) tampered-sig must NOT verify; got exit={:?}: {}",
+                    result.status.code(),
+                    String::from_utf8_lossy(&result.stdout)
+                );
+                let out = format!(
+                    "{}{}",
+                    String::from_utf8_lossy(&result.stdout),
+                    String::from_utf8_lossy(&result.stderr)
+                );
+                assert!(
+                    out.to_lowercase().contains("signature")
+                        || out.to_lowercase().contains("verify")
+                        || out.to_lowercase().contains("failed")
+                        || out.to_lowercase().contains("error"),
+                    "(b) rejection output must name the problem; got: {out}"
+                );
+            }
+            Err(e) => panic!("(b) update-ref failed after hash-object succeeded: {e}"),
+        },
+        Err(e) => panic!(
+            "(b) ALTERNATIVE NEEDED: git refused to store tampered sig: {e}\n\
+             The existing test verify_signed_objects_times_and_failure_reasons \
+             covers the same code path via tampered commit signatures."
+        ),
+    }
+}
