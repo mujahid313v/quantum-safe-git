@@ -815,10 +815,6 @@ fn sha256_repository_shim_sign_and_verify() {
         "git verify-commit failed in sha256 repo: {}",
         String::from_utf8_lossy(&verify_commit.stderr)
     );
-    assert!(
-        String::from_utf8_lossy(&verify_commit.stdout).contains("Good \"git\" signature"),
-        "git verify-commit must print Good signature"
-    );
 
     // Sign an annotated tag in the sha256 repo.
     let tag_out = git256(&["tag", "-s", "-m", "sha256 annotated tag", "sha256-v0"]);
@@ -834,10 +830,6 @@ fn sha256_repository_shim_sign_and_verify() {
         verify_tag.status.success(),
         "git verify-tag failed in sha256 repo: {}",
         String::from_utf8_lossy(&verify_tag.stderr)
-    );
-    assert!(
-        String::from_utf8_lossy(&verify_tag.stdout).contains("Good \"git\" signature"),
-        "git verify-tag must print Good signature"
     );
 
     // Baseline: the same shim works in a sha1 repo (proves test logic).

@@ -87,7 +87,7 @@ def main():
     write_section(lines, "sigver_fail", ver_fail, fields)
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text("\n".join(lines) + "\n", encoding="ascii")
+    OUT.write_text("\n".join(lines) + "\n", encoding="ascii", newline="\n")
     # Only metadata and test IDs are printed; vector bytes are never logged.
     print(
         "Fetched pinned NIST ML-DSA-65 ACVP subset: "

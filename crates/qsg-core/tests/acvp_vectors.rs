@@ -1,4 +1,4 @@
-use ml_dsa::{ExpandedSigningKey, ExpandedSigningKeyBytes, Keypair, MlDsa65, Seed, SigningKey};
+﻿use ml_dsa::{ExpandedSigningKey, ExpandedSigningKeyBytes, Keypair, MlDsa65, Seed, SigningKey};
 use qsg_core::{PublicKey, Signature, verify};
 use std::{collections::HashMap, fs, path::PathBuf};
 
@@ -8,7 +8,7 @@ use std::{collections::HashMap, fs, path::PathBuf};
 /// then `shasum -a 256 target/acvp/ml-dsa65-kat.txt` (Linux/macOS) or
 /// `(Get-FileHash target/acvp/ml-dsa65-kat.txt -Algorithm SHA256).Hash`
 /// (Windows PowerShell), and paste the hex below (lower-case).
-const ACVP_KAT_SHA256: &str = "2948bd6cb8b15d17cca873863016a1c67228a8f5d9d45064dabcf68564ef1511";
+const ACVP_KAT_SHA256: &str = "e9130ae5edeab1972c10609c72cde1437920d318064cd6ca3b43dfc52d2f0e95";
 
 fn sha256_hex(path: &std::path::Path) -> String {
     let bytes = fs::read(path).unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));

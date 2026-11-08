@@ -1002,7 +1002,18 @@ fn sha256_repository_qsg_verify_and_verify_range() {
         String::from_utf8_lossy(&verify_tag.stderr)
     );
 
-    // verify-range: one signed commit, expect success.
+    // Add a second signed commit so we have a non-trivial range.
+    std::fs::write(repo.join("file2.txt"), "second signed\n").unwrap();
+    let add2s = git256(&["add", "file2.txt"]);
+    assert!(add2s.status.success());
+    let commit2s = git256(&["commit", "-S", "-m", "second signed commit"]);
+    assert!(
+        commit2s.status.success(),
+        "second signed commit failed: {}",
+        String::from_utf8_lossy(&commit2s.stderr)
+    );
+
+    // verify-range: two signed commits, expect success.
     let head_hex = {
         let out = git256(&["rev-parse", "HEAD"]);
         assert!(out.status.success());
@@ -1011,12 +1022,12 @@ fn sha256_repository_qsg_verify_and_verify_range() {
 
     // Add an unsigned commit for the failure case.
     std::fs::write(repo.join("unsigned.txt"), "unsigned\n").unwrap();
-    let add2 = git256(&["add", "unsigned.txt"]);
-    assert!(add2.status.success());
-    let commit2 = git256(&["commit", "--no-gpg-sign", "-m", "unsigned commit"]);
-    assert!(commit2.status.success());
+    let add_u = git256(&["add", "unsigned.txt"]);
+    assert!(add_u.status.success());
+    let commit_u = git256(&["commit", "--no-gpg-sign", "-m", "unsigned commit"]);
+    assert!(commit_u.status.success());
 
-    // verify-range over just the signed commit: success.
+    // verify-range over just the signed commits: success.
     let range_pass = qsg(
         &repo,
         &[
