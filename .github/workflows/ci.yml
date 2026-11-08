@@ -5,15 +5,19 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
       - name: Toolchain
         run: |
           rustup update stable
@@ -41,3 +45,7 @@ jobs:
         env:
           QSG_REQUIRE_SSH_KEYGEN: "1"
         run: cargo test --workspace --no-fail-fast
+      - name: Shim output (nocapture)
+        env:
+          QSG_REQUIRE_SSH_KEYGEN: "1"
+        run: cargo test -p qsg-ssh-keygen --test git_end_to_end -- --nocapture

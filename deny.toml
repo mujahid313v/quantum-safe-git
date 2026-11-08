@@ -1,0 +1,58 @@
+# cargo-deny configuration
+# Licenses in the dependency tree (from `cargo metadata`):
+#   Apache-2.0 OR MIT              — ml-dsa, chacha20poly1305, der, zeroize, ...
+#   MIT OR Apache-2.0              — aead, argon2, base64, libc, serde, sha2, ...
+#   Apache-2.0                     — rpassword, rtoolbox
+#   MIT                            — generic-array, libm, spin
+#   BSD-3-Clause                   — curve25519-dalek, ed25519-dalek, subtle
+#   (MIT OR Apache-2.0) AND Unicode-3.0 — unicode-ident
+#   Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT — rustix, linux-raw-sys
+#   BSD-2-Clause OR Apache-2.0 OR MIT — zerocopy
+#   MIT OR Apache-2.0 OR BSD-1-Clause — fiat-crypto
+#   MIT OR Apache-2.0 OR LGPL-2.1-or-later — r-efi
+#   MIT/Apache-2.0 (slash = OR)    — rusty-fork, wait-timeout, quick-error, ...
+#   Apache-2.0 / MIT (slash = OR) — fnv
+#
+# How OR-expressions are evaluated: cargo-deny accepts the package if at least
+# one branch of the OR is in the allow list. AND requires all branches to be
+# satisfied. So (MIT OR Apache-2.0) AND Unicode-3.0 passes because MIT is in the
+# allow list AND Unicode-3.0 is in the allow list.
+
+[graph]
+all-features = true
+
+[advisories]
+# Report all advisories; do not hide or ignore any.
+yanked = "warn"
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-3-Clause",
+    "BSD-2-Clause",
+    "BSD-1-Clause",
+    "Unicode-3.0",
+    "LGPL-2.1-or-later",
+]
+# How OR-expressions work: cargo-deny passes a package if at least one branch
+# of the OR is in this allow list. AND requires every branch to be satisfied.
+# So "(MIT OR Apache-2.0) AND Unicode-3.0" passes because both MIT and
+# Unicode-3.0 are listed. "MIT OR Apache-2.0 OR LGPL-2.1-or-later" passes
+# because MIT is listed. "BSD-2-Clause OR Apache-2.0 OR MIT" passes because
+# MIT is listed. Every expression in the current lockfile is covered.
+#
+# Unlicensed workspace members are ignored via [private] below.
+confidence-threshold = 0.8
+
+[private]
+ignore = true
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"
+
+[sources]
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+unknown-registry = "deny"
+unknown-git = "deny"
