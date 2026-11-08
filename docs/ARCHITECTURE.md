@@ -1,6 +1,6 @@
 # Architecture
 
-**Status: evolving implementation and design document. M1–M5a library and executable work is present; M5b and later remain planned. Experimental, unaudited, and not for production use.**
+**Status: M1-M5b libraries and commands are implemented; M6 and later remain planned. Experimental, unaudited, and not for production use.**
 
 ## Idea
 
@@ -14,8 +14,9 @@ Git can delegate commit and tag signing to an external program (`gpg.format ssh`
 | `qsg-sshsig` | Implemented strict signature-container encoding and decoding ([SPEC.md](SPEC.md)). |
 | `qsg-keystore` | Implemented key generation and encrypted private-key storage. |
 | `qsg-trust` | Implemented `allowed_signers`, validity-window, and revocation parsing/helpers. |
-| `qsg-cli` (binary `qsg`) | M5a implements `keygen` and `pubkey`; remaining user commands are M5b. |
-| `qsg-ssh-keygen` | M5a implements Git's `-Y sign`, `find-principals`, and `verify` calls. |
+| `qsg-cli` (binary `qsg`) | Implements `keygen`, `pubkey`, `verify`, `verify-range`, `trust add/list/revoke`, and read-only `doctor`; object payload extraction follows Git's commit/tag parsing rules. |
+| `qsg-verify` | Shared trust, validity, revocation, and cryptographic verification used by both the shim and standalone CLI. |
+| `qsg-ssh-keygen` | Implements Git's `-Y sign`, `find-principals`, and `verify` calls; only the shim prints Git's successful `Good "git" signature ...` line. |
 
 Crypto backend: RustCrypto `ml-dsa` 0.1.2, selected in [ADR 0001](adr/0001-crypto-backend.md); it has not been independently audited.
 
@@ -36,7 +37,7 @@ Verification:
 
 The same flows serve tags. Nothing needs a network or a service.
 
-`qsg verify-range <base>..<head> --allowed-signers <file>` (planned) checks many commits for CI use.
+`qsg verify-range <base>..<head> --allowed-signers <file>` checks the Git revision range in reverse order, including merge commits. It uses the same shared verification checks as the shim. Its trust-file safeguard compares the actual file bytes to the base blob for repository-tracked paths; outside/untracked files still require a trusted pipeline source.
 
 ## Planned or out of scope for v0.1
 
@@ -57,7 +58,7 @@ Not goals at all: blockchain, machine-learning anomaly detection, mobile app, ma
 
 ## Platforms
 
-v0.1 targets Linux and macOS. Tested with Git 2.55.0 on Windows and Git 2.56.0 on Ubuntu and macOS. Git 2.34 is the first version with SSH signing, but is untested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
+v0.1 targets Linux and macOS; Windows is supported for development and testing only, and private-key file permissions are not enforced there. Tested with Git 2.55.0 on Windows and Git 2.56.0 on Ubuntu and macOS. Git 2.34 is the first version with SSH signing, but is untested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
 
 ## SHA-256 repositories
 

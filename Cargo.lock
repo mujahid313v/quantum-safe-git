@@ -794,9 +794,14 @@ name = "qsg"
 version = "0.1.0"
 dependencies = [
  "base64",
+ "proptest",
  "qsg-keystore",
+ "qsg-sshsig",
+ "qsg-trust",
+ "qsg-verify",
  "rpassword",
  "tempfile",
+ "time",
  "zeroize",
 ]
 
@@ -837,6 +842,7 @@ dependencies = [
  "qsg-keystore",
  "qsg-sshsig",
  "qsg-trust",
+ "qsg-verify",
  "rpassword",
  "tempfile",
  "time",
@@ -869,6 +875,16 @@ dependencies = [
  "ssh-key",
  "tempfile",
  "thiserror",
+]
+
+[[package]]
+name = "qsg-verify"
+version = "0.1.0"
+dependencies = [
+ "qsg-keystore",
+ "qsg-sshsig",
+ "qsg-trust",
+ "time",
 ]
 
 [[package]]

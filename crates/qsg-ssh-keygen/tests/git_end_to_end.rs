@@ -163,8 +163,8 @@ fn setup() -> Setup {
 fn git_commit_tag_and_verification_failures_work_end_to_end() {
     if !tool_exists("git") || !tool_exists("ssh-keygen") {
         let message = "skipped qsg Git integration: git or ssh-keygen is missing";
-        if std::env::var_os("QSG_REQUIRE_SSH_KEYGEN").is_some() {
-            panic!("{message} while QSG_REQUIRE_SSH_KEYGEN is set");
+        if std::env::var("QSG_REQUIRE_SSH_KEYGEN").as_deref() == Ok("1") {
+            panic!("{message} while QSG_REQUIRE_SSH_KEYGEN=1");
         }
         eprintln!("{message}");
         return;
@@ -187,8 +187,10 @@ fn git_commit_tag_and_verification_failures_work_end_to_end() {
     let rejected_r = git(repo, &["verify-commit", "HEAD"]);
     report_failure("gpg.ssh.revocationFile with QSG shim", &rejected_r);
     assert!(!rejected_r.status.success());
+    assert_eq!(rejected_r.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&rejected_r.stdout).is_empty());
     assert!(
-        String::from_utf8_lossy(&rejected_r.stderr).contains("unsupported flag -r"),
+        String::from_utf8_lossy(&rejected_r.stderr).contains("unsupported flag -r\n"),
         "shim -r output: {}",
         String::from_utf8_lossy(&rejected_r.stderr)
     );
@@ -543,4 +545,140 @@ fn shim_rejects_a_crafted_non_git_namespace_signature() {
     );
     assert_eq!(output.status.code(), Some(255));
     assert!(String::from_utf8_lossy(&output.stderr).contains("unsupported SSHSIG namespace"));
+    assert_eq!(output.status.code(), Some(255));
+    assert!(output.stdout.is_empty());
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr),
+        "invalid signature: unsupported SSHSIG namespace\n"
+    );
+}
+
+#[test]
+fn shim_verification_output_and_exit_codes_are_golden() {
+    if !tool_exists("git") {
+        let message = "skipped shim golden output test: git is missing";
+        if std::env::var("QSG_REQUIRE_SSH_KEYGEN").as_deref() == Ok("1") {
+            panic!("{message} while QSG_REQUIRE_SSH_KEYGEN=1");
+        }
+        eprintln!("{message}");
+        return;
+    }
+    let setup = setup();
+    let public = qsg_keystore::read_public(setup.temp.path().join("keys/first.pub")).unwrap();
+    let (key, secret, _) = qsg_keystore::load_secret(&setup.key1, None, true).unwrap();
+    let message = b"golden shim payload\n";
+    let record = qsg_sshsig::sign_ml_dsa65(&key, &secret, message).unwrap();
+    let sig_path = setup.temp.path().join("golden.sshsig");
+    let blob = qsg_sshsig::encode_blob(&record).unwrap();
+    fs::write(&sig_path, qsg_sshsig::encode_armor(&blob).unwrap()).unwrap();
+    fs::write(
+        &setup.allowed,
+        format!(
+            "{PRINCIPAL} namespaces=\"git\" ssh-mldsa65@qsgit {}\n",
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &public.blob)
+        ),
+    )
+    .unwrap();
+
+    let run = |args: &[&str], input: &[u8]| {
+        let mut child = Command::new(env!("CARGO_BIN_EXE_qsg-ssh-keygen"))
+            .args(args)
+            .env_remove("QSG_REVOKED_KEYS")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        child.stdin.take().unwrap().write_all(input).unwrap();
+        child.wait_with_output().unwrap()
+    };
+    let verify_args = [
+        "-Y",
+        "verify",
+        "-n",
+        "git",
+        "-f",
+        setup.allowed.to_str().unwrap(),
+        "-I",
+        PRINCIPAL,
+        "-s",
+        sig_path.to_str().unwrap(),
+        "-Overify-time=20250101000000",
+    ];
+    let success = run(&verify_args, message);
+    assert_eq!(success.status.code(), Some(0));
+    assert_eq!(
+        success.stdout,
+        format!(
+            "Good \"git\" signature for {PRINCIPAL} with MLDSA65 key {}\n",
+            public.fingerprint
+        )
+        .as_bytes()
+    );
+    assert!(success.stderr.is_empty());
+
+    fs::write(&setup.allowed, "").unwrap();
+    let no_principal = run(
+        &[
+            "-Y",
+            "find-principals",
+            "-f",
+            setup.allowed.to_str().unwrap(),
+            "-s",
+            sig_path.to_str().unwrap(),
+            "-Overify-time=20250101000000",
+        ],
+        b"",
+    );
+    assert_eq!(no_principal.status.code(), Some(255));
+    assert_eq!(no_principal.stdout, b"No principal matched.\n");
+    assert!(no_principal.stderr.is_empty());
+
+    for (args, error) in [
+        (
+            vec!["-Y", "verify", "-r", "revocations"],
+            "unsupported flag -r\n",
+        ),
+        (
+            vec!["-Y", "check-novalidate", "-n", "git", "-s", "signature"],
+            "unsupported -Y subcommand: check-novalidate\n",
+        ),
+    ] {
+        let output = run(&args, b"");
+        assert_eq!(output.status.code(), Some(255));
+        assert!(output.stdout.is_empty());
+        assert_eq!(String::from_utf8_lossy(&output.stderr), error);
+    }
+
+    fs::write(
+        &setup.allowed,
+        format!(
+            "{PRINCIPAL} namespaces=\"git\" ssh-mldsa65@qsgit {}\n",
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &public.blob)
+        ),
+    )
+    .unwrap();
+    let tampered = run(&verify_args, b"tampered payload\n");
+    assert_eq!(tampered.status.code(), Some(255));
+    assert_eq!(tampered.stdout, b"Could not verify signature.\n");
+    assert_eq!(
+        tampered.stderr,
+        b"Signature verification failed: incorrect signature\n"
+    );
+
+    fs::write(
+        setup.temp.path().join("revoked_keys"),
+        format!("{}\n", public.fingerprint),
+    )
+    .unwrap();
+    let revoked = run(&verify_args, message);
+    assert_eq!(revoked.status.code(), Some(255));
+    assert!(revoked.stdout.is_empty());
+    assert_eq!(
+        String::from_utf8_lossy(&revoked.stderr),
+        format!(
+            "Could not verify signature.\nkey is revoked: {}\n",
+            public.fingerprint
+        )
+    );
 }

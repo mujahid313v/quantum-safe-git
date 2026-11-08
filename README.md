@@ -13,10 +13,10 @@ An earlier prototype (Dilithium-3, pre-standard parameters) lives on the `legacy
 | M0: Git SSH-signing interface spike | All reproducible call/failure cells verified on Windows, Ubuntu, and macOS; Git 2.34 remains untested. See [docs/GIT-INTERFACE.md](docs/GIT-INTERFACE.md) |
 | M1–M4 libraries | Implemented; review and security audit pending |
 | M5a: `qsg keygen`, `qsg pubkey`, Git SSH-signing shim | Implemented; end-to-end tests pass on Windows and Linux/macOS CI |
-| M5b: trust/verify/verify-range/doctor commands | Planned |
+| M5b: `qsg trust`, `verify`, `verify-range`, and `doctor` | Implemented; final validation and CI pending |
 | M6–M8 | Planned |
 
-M1–M4 library functionality is implemented. M5a adds key generation, public-key display, and a Git signing/verifying shim; its end-to-end tests pass on Windows and Linux/macOS CI.
+M1–M4 library functionality is implemented. M5a adds key generation, public-key display, and a Git signing/verifying shim. M5b adds trust management, standalone object/range verification, and diagnostics; final validation and CI are pending.
 
 ## M5a workflow
 
@@ -34,9 +34,9 @@ git verify-commit HEAD
 
 ## Components
 
-- `qsg`: M5a implements `keygen` and `pubkey`; more commands are planned for M5b.
+- `qsg`: implements `keygen`, `pubkey`, `verify`, `verify-range`, `trust`, and `doctor`.
 - `qsg-ssh-keygen`: implements the Git `-Y sign`, `find-principals`, and `verify` calls.
-- Workspace libraries: `qsg-core`, `qsg-sshsig`, `qsg-keystore`, and `qsg-trust`.
+- Workspace libraries: `qsg-core`, `qsg-sshsig`, `qsg-keystore`, `qsg-trust`, and shared `qsg-verify`.
 
 Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The list of what is out of scope for v0.1 lives there, in one place.
 
@@ -44,6 +44,8 @@ Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The list of what is out o
 
 - QSGit signatures will not verify with stock `ssh-keygen`, and GitHub will not show a "Verified" badge for them.
 - Trust comes only from a local `allowed_signers` file. See [docs/TRUST-MODEL.md](docs/TRUST-MODEL.md).
+
+v0.1 targets Linux and macOS; Windows is supported for development and testing only, and private-key file permissions are not enforced there.
 
 ## Roadmap
 
@@ -55,7 +57,7 @@ Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The list of what is out o
 | M3 | Encrypted key storage | Implemented on `m3/keystore`; review pending |
 | M4 | allowed_signers parsing, validity, revocation | Implemented on `m4/trust`; review pending |
 | M5a | `qsg keygen`, `qsg pubkey`, and `qsg-ssh-keygen` Git shim | Implemented; end-to-end tests pass on Windows and Linux/macOS CI |
-| M5b | `trust`, `verify`, `verify-range`, and `doctor` CLI commands | Planned |
+| M5b | `trust`, `verify`, `verify-range`, and `doctor` CLI commands | Implemented; final validation and CI pending |
 | M6 | End-to-end tests and CI | Planned |
 | M7 | Documentation and security pass | Planned |
 | M8 | v0.1.0 release candidate | Planned |

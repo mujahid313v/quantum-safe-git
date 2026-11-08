@@ -40,4 +40,4 @@ jobs:
       - name: Test
         env:
           QSG_REQUIRE_SSH_KEYGEN: "1"
-        run: cargo test --workspace
+        run: cargo test --workspace --no-fail-fast

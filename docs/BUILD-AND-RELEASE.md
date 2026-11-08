@@ -1,6 +1,6 @@
 # Build and release
 
-**Status: experimental. The workspace compiles but contains no functionality.**
+**Status: experimental. The workspace implements ML-DSA-65 signing and verification, key storage, trust parsing, the Git shim, and the `qsg` commands. No independent security audit has been completed.**
 
 ## Build
 
@@ -11,7 +11,7 @@ cargo build --workspace
 cargo test --workspace
 ```
 
-Targets for v0.1 are Linux and macOS. On Windows, WSL (Ubuntu) is recommended. Native Windows needs the Visual Studio C++ Build Tools for the Rust linker.
+v0.1 targets Linux and macOS; Windows is supported for development and testing only, and private-key file permissions are not enforced there. Native Windows development requires the Visual Studio C++ Build Tools for the Rust linker.
 
 Tested with Git 2.55.0 on Windows and Git 2.56.0 on Ubuntu and macOS. Git 2.34 is the first version with SSH signing, but is untested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
 
