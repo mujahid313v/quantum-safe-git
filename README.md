@@ -13,8 +13,9 @@ An earlier prototype (Dilithium-3, pre-standard parameters) lives on the `legacy
 | M0: Git SSH-signing interface spike | All reproducible call/failure cells verified on Windows, Ubuntu, and macOS; Git 2.34 remains untested. See [docs/GIT-INTERFACE.md](docs/GIT-INTERFACE.md) |
 | M1–M4 libraries | Implemented; review and security audit pending |
 | M5a: `qsg keygen`, `qsg pubkey`, Git SSH-signing shim | Implemented; end-to-end tests pass on Windows and Linux/macOS CI |
-| M5b: `qsg trust`, `verify`, `verify-range`, and `doctor` | Implemented; final validation and CI pending |
-| M6–M8 | Planned |
+| M5b: `qsg trust`, `verify`, `verify-range`, and `doctor` | Implemented; CI passing on Ubuntu and macOS |
+| M6: end-to-end tests, supply-chain checks and CI hardening | Implemented on `m6/tests-ci`; CI passing |
+| M7�M8 | Planned |
 
 M1–M4 library functionality is implemented. M5a adds key generation, public-key display, and a Git signing/verifying shim. M5b adds trust management, standalone object/range verification, and diagnostics; final validation and CI are pending.
 
@@ -57,8 +58,8 @@ v0.1 targets Linux and macOS; Windows is supported for development and testing o
 | M3 | Encrypted key storage | Implemented on `m3/keystore`; review pending |
 | M4 | allowed_signers parsing, validity, revocation | Implemented on `m4/trust`; review pending |
 | M5a | `qsg keygen`, `qsg pubkey`, and `qsg-ssh-keygen` Git shim | Implemented; end-to-end tests pass on Windows and Linux/macOS CI |
-| M5b | `trust`, `verify`, `verify-range`, and `doctor` CLI commands | Implemented; final validation and CI pending |
-| M6 | End-to-end tests and CI | Planned |
+| M5b | `trust`, `verify`, `verify-range`, and `doctor` CLI commands | Implemented; CI passing on Ubuntu and macOS |
+| M6 | End-to-end tests and CI | Implemented on `m6/tests-ci`; SHA-256 e2e, tampered tag, ACVP pin, supply-chain audit, workflow hardening |
 | M7 | Documentation and security pass | Planned |
 | M8 | v0.1.0 release candidate | Planned |
 

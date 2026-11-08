@@ -22,10 +22,32 @@ The M1 backend is the pure-Rust RustCrypto `ml-dsa` crate, pinned in `crates/qsg
 ```bash
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
+cargo test --workspace --no-fail-fast
 ```
 
-Fuzzing (planned): `cargo-fuzz`, which needs a nightly toolchain. Dependency checks (planned): `cargo audit`, `cargo deny`.
+### CI workflows
+
+| Workflow | File | Triggers | Required for PR? |
+|---|---|---|---|
+| CI | `.github/workflows/ci.yml` | push to main, PRs | **Yes** — jobs `check (ubuntu-latest)` and `check (macos-latest)` |
+| Supply chain | `.github/workflows/audit.yml` | weekly schedule, workflow_dispatch, PRs touching Cargo.toml/Cargo.lock | No |
+| Git minimum version | `.github/workflows/git-min-version.yml` | workflow_dispatch only | No |
+| Fuzz smoke | `.github/workflows/fuzz.yml` | workflow_dispatch only | No |
+
+The required CI workflow runs on every PR:
+1. `cargo fmt --all -- --check`
+2. `cargo clippy --workspace --all-targets -- -D warnings`
+3. Fetch pinned NIST ACVP vectors (`python3 crates/qsg-core/tests/fetch_acvp_vectors.py`)
+4. OpenSSH version check (`ssh -V`)
+5. Git verify-time spike (`python3 tools/spike/verify_time.py --check`)
+6. Git SSH interface contract (`python3 tools/spike/git_interface_contract.py`)
+7. Git trusted/untrusted call matrix (`python3 tools/spike/git_call_state_matrix.py`)
+8. `cargo test --workspace --no-fail-fast` (with `QSG_REQUIRE_SSH_KEYGEN=1`)
+9. Shim output (nocapture): `cargo test -p qsg-ssh-keygen --test git_end_to_end -- --nocapture`
+
+The supply-chain workflow installs `cargo-audit 0.22.2` and `cargo-deny 0.20.2` with `--locked` (both MIT OR Apache-2.0). It reports all findings without hiding them. Scheduled workflows consume private-repo GitHub Actions minutes.
+
+Fuzzing uses `cargo-fuzz` on nightly Rust. Each fuzz target runs for 60 seconds.
 
 ## Versioning
 
