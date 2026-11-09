@@ -23,20 +23,24 @@ jobs:
           git --version
       - name: Install Rust
         run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          source "$HOME/.cargo/env"
+          export HOME=/root
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
+          export PATH="$HOME/.cargo/bin:$PATH"
           rustup component add clippy rustfmt
       - name: Format
         run: |
-          source "$HOME/.cargo/env"
+          export HOME=/root
+          export PATH="$HOME/.cargo/bin:$PATH"
           cargo fmt --all -- --check
       - name: Clippy
         run: |
-          source "$HOME/.cargo/env"
+          export HOME=/root
+          export PATH="$HOME/.cargo/bin:$PATH"
           cargo clippy --workspace --all-targets -- -D warnings
       - name: Test
         env:
           QSG_REQUIRE_SSH_KEYGEN: "1"
+          HOME: /root
         run: |
-          source "$HOME/.cargo/env"
+          export PATH="/root/.cargo/bin:$PATH"
           cargo test -p qsg-ssh-keygen --test git_end_to_end -- --nocapture
