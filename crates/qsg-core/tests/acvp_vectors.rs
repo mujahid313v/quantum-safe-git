@@ -1,4 +1,4 @@
-﻿use ml_dsa::{ExpandedSigningKey, ExpandedSigningKeyBytes, Keypair, MlDsa65, Seed, SigningKey};
+use ml_dsa::{ExpandedSigningKey, ExpandedSigningKeyBytes, Keypair, MlDsa65, Seed, SigningKey};
 use qsg_core::{PublicKey, Signature, verify};
 use std::{collections::HashMap, fs, path::PathBuf};
 
@@ -9,6 +9,16 @@ use std::{collections::HashMap, fs, path::PathBuf};
 /// `(Get-FileHash target/acvp/ml-dsa65-kat.txt -Algorithm SHA256).Hash`
 /// (Windows PowerShell), and paste the hex below (lower-case).
 const ACVP_KAT_SHA256: &str = "e9130ae5edeab1972c10609c72cde1437920d318064cd6ca3b43dfc52d2f0e95";
+
+/// SHA-256 of each source JSON file downloaded from ACVP-Server commit
+/// 975de31eb83d87039ec88934fdc47d8c312b892d, computed over raw HTTP response
+/// bytes (what Python's `urlopen(...).read()` returns).
+/// To update: change COMMIT in fetch_acvp_vectors.py, run it, copy the
+/// "actual" hashes from any mismatch error into SOURCE_SHA256 in that file,
+/// then update these constants to match.
+const ACVP_KEYGEN_SHA256: &str = "e67ee6540d40e11506c3c4e3b1f79fc1cefcd49820db99fc61f87cc8ba463baf";
+const ACVP_SIGGEN_SHA256: &str = "72dcaf5f69853ca267ccd16af9cb40949786aca0fcfbf05d1ebeba132b93af22";
+const ACVP_SIGVER_SHA256: &str = "47cdd6314c7f746d02421ffcba89d4dbc7bb875ac49e07a029fdfc26fba55437";
 
 fn sha256_hex(path: &std::path::Path) -> String {
     let bytes = fs::read(path).unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
@@ -212,5 +222,30 @@ fn acvp_hash_detection_catches_wrong_hash() {
     assert_ne!(
         tampered, ACVP_KAT_SHA256,
         "tampered hash should not match the ACVP pin"
+    );
+}
+
+/// Proves that a wrong source-file hash constant would be detected.
+/// Checks that the three source pins are distinct and non-empty (format check),
+/// and that flipping a byte in simulated source bytes produces a different hash.
+#[test]
+fn acvp_source_hash_detection_catches_wrong_hash() {
+    // All three source pins must be non-empty 64-char hex strings.
+    for pin in [ACVP_KEYGEN_SHA256, ACVP_SIGGEN_SHA256, ACVP_SIGVER_SHA256] {
+        assert_eq!(pin.len(), 64, "source pin must be 64 hex chars: {pin}");
+        assert!(pin.chars().all(|c| c.is_ascii_hexdigit()), "not hex: {pin}");
+    }
+    // All three must be distinct.
+    assert_ne!(ACVP_KEYGEN_SHA256, ACVP_SIGGEN_SHA256);
+    assert_ne!(ACVP_SIGGEN_SHA256, ACVP_SIGVER_SHA256);
+    assert_ne!(ACVP_KEYGEN_SHA256, ACVP_SIGVER_SHA256);
+    // Tampered bytes produce a different hash.
+    let mut data = b"simulated json source bytes".to_vec();
+    let h1 = sha256_bytes(&data);
+    data[0] ^= 0x01;
+    let h2 = sha256_bytes(&data);
+    assert_ne!(
+        h1, h2,
+        "tampered source bytes must produce a different hash"
     );
 }

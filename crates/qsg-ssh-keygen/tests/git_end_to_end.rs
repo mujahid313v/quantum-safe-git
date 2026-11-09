@@ -11,6 +11,21 @@ fn tool_exists(name: &str) -> bool {
     Command::new(name).arg("--version").output().is_ok()
 }
 
+/// Require `tools` to exist; panic with a clear message if any are missing and
+/// `QSG_REQUIRE_SSH_KEYGEN=1`, or print a skip message and return `false`.
+fn require_tools(tools: &[&str]) -> bool {
+    let missing: Vec<_> = tools.iter().copied().filter(|t| !tool_exists(t)).collect();
+    if missing.is_empty() {
+        return true;
+    }
+    let message = format!("skipped: {} not found", missing.join(", "));
+    if std::env::var("QSG_REQUIRE_SSH_KEYGEN").as_deref() == Ok("1") {
+        panic!("{message} while QSG_REQUIRE_SSH_KEYGEN=1");
+    }
+    eprintln!("{message}");
+    false
+}
+
 fn git(dir: &Path, args: &[&str]) -> Output {
     git_custom(dir, args, None, None, None)
 }
@@ -161,12 +176,7 @@ fn setup() -> Setup {
 
 #[test]
 fn git_commit_tag_and_verification_failures_work_end_to_end() {
-    if !tool_exists("git") || !tool_exists("ssh-keygen") {
-        let message = "skipped qsg Git integration: git or ssh-keygen is missing";
-        if std::env::var("QSG_REQUIRE_SSH_KEYGEN").as_deref() == Ok("1") {
-            panic!("{message} while QSG_REQUIRE_SSH_KEYGEN=1");
-        }
-        eprintln!("{message}");
+    if !require_tools(&["git", "ssh-keygen"]) {
         return;
     }
     let setup = setup();
@@ -379,12 +389,7 @@ fn git_commit_tag_and_verification_failures_work_end_to_end() {
 
 #[test]
 fn git_openssh_revocation_file_blocks_revoked_ed25519_key() {
-    if !tool_exists("git") || !tool_exists("ssh-keygen") {
-        let message = "skipped OpenSSH Git revocation test: git or ssh-keygen is missing";
-        if std::env::var("QSG_REQUIRE_SSH_KEYGEN").as_deref() == Ok("1") {
-            panic!("{message} while QSG_REQUIRE_SSH_KEYGEN=1");
-        }
-        eprintln!("{message}");
+    if !require_tools(&["git", "ssh-keygen"]) {
         return;
     }
 
@@ -563,12 +568,7 @@ fn shim_rejects_a_crafted_non_git_namespace_signature() {
 
 #[test]
 fn shim_verification_output_and_exit_codes_are_golden() {
-    if !tool_exists("git") {
-        let message = "skipped shim golden output test: git is missing";
-        if std::env::var("QSG_REQUIRE_SSH_KEYGEN").as_deref() == Ok("1") {
-            panic!("{message} while QSG_REQUIRE_SSH_KEYGEN=1");
-        }
-        eprintln!("{message}");
+    if !require_tools(&["git"]) {
         return;
     }
     let setup = setup();
@@ -698,12 +698,7 @@ fn shim_verification_output_and_exit_codes_are_golden() {
 #[cfg(unix)]
 #[test]
 fn sha256_repository_shim_sign_and_verify() {
-    if !tool_exists("git") || !tool_exists("ssh-keygen") {
-        let message = "skipped sha256 shim e2e: git or ssh-keygen missing";
-        if std::env::var("QSG_REQUIRE_SSH_KEYGEN").as_deref() == Ok("1") {
-            panic!("{message} while QSG_REQUIRE_SSH_KEYGEN=1");
-        }
-        eprintln!("{message}");
+    if !require_tools(&["git", "ssh-keygen"]) {
         return;
     }
 
@@ -756,6 +751,17 @@ fn sha256_repository_shim_sign_and_verify() {
         String::from_utf8_lossy(&fmt_out.stdout).trim(),
         "sha256",
         "repository must use sha256 object format"
+    );
+
+    // Print git version and object format so the nocapture CI step shows them.
+    let ver = Command::new("git")
+        .arg("--version")
+        .output()
+        .expect("run git");
+    eprintln!(
+        "sha256 test env: git={} object-format={}",
+        String::from_utf8_lossy(&ver.stdout).trim(),
+        String::from_utf8_lossy(&fmt_out.stdout).trim()
     );
 
     // Helper: run git in the sha256 repo with isolated config.
