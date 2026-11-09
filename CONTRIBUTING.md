@@ -14,7 +14,8 @@ QSGit is experimental and moves in small milestones (see the roadmap in the READ
 ```bash
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
+cargo test --workspace --no-fail-fast
+Supply-chain checks (`cargo audit`, `cargo deny`) run in `.github/workflows/audit.yml` on a schedule and on pull requests that change `Cargo.toml` or `Cargo.lock`; they are not required checks. Please look at their output when you add or update a dependency.
 ```
 
 ## Rules for cryptographic code
