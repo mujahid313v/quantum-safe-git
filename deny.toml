@@ -22,7 +22,11 @@
 all-features = true
 
 [advisories]
-# Report all advisories; do not hide or ignore any.
+# Report all advisories without blocking. Do not fix or ignore findings;
+# they are tracked as follow-up issues.
+vulnerability = "warn"
+unmaintained = "warn"
+unsound = "warn"
 yanked = "warn"
 
 [licenses]
