@@ -6,7 +6,7 @@
 - Windows 11, Git 2.55.0.windows.5, OpenSSH_for_Windows 9.5p2 (LibreSSL 3.8.2); the original M0 wrapper spike also used Git Bash OpenSSH 10.5p1.
 - Ubuntu 24.04 CI, Git 2.56.0, Linux 7.0.0-1017-azure, OpenSSH_9.6p1 Ubuntu-3ubuntu13.20.
 - macOS CI, Git 2.56.0, Darwin 25.6.0, OpenSSH_10.3p1.
-- Git 2.55.0 was tested locally on Windows; Git 2.56.0 was tested in CI on Ubuntu and macOS. Git 2.34 is the first release with SSH signing, but is untested; see issue [#67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
+- Git 2.55.0 was tested locally on Windows; Git 2.56.0 was tested in CI on Ubuntu and macOS. Git 2.34.1 is known NOT to work: it does not pass `-Overify-time` to `find-principals` (source-verified from [git/git gpg-interface.c v2.34.0](https://github.com/git/git/blob/v2.34.0/gpg-interface.c) vs [v2.35.0](https://github.com/git/git/blob/v2.35.0/gpg-interface.c)); the shim fails closed. Git 2.35.0 is the first version with the fix. Versions between 2.35 and 2.55 are untested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67). The `qsg doctor` text still says 2.34 and is tracked in that issue.
 - Method: (1) a logging wrapper around the real `ssh-keygen`, (2) a fake program returning a dummy armored blob, both set as `gpg.ssh.program`.
 
 - Object formats tested with the real `ssh-keygen`: sha1 and sha256. The calls were identical.
@@ -51,7 +51,7 @@ Observed behavior: Git formats the commit's epoch timestamp in the machine's loc
 
 ## Not verified
 
-- Git 2.34 and versions other than Git 2.55.0 and 2.56.0.
+- Git 2.34.1 is known NOT to work (does not pass `-Overify-time`; source-verified). Git 2.35.0 is the minimum. Versions between 2.35 and 2.55 are untested. See [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
 - Stock OpenSSH wrong-namespace verification through Git using a crafted external signature. The non-reproducibility claim is an inference from Git's normal `git` namespace flow, not a reproduced test; that D7 cell is marked **UNVERIFIED** below.
 - Whether the real-OpenSSH KRL revocation case fails for the right reason on every OS: that test now has a baseline "verify succeeds before the KRL is configured" check (added in M6). See D7 table below for verified per-OS values.
 

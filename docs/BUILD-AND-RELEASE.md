@@ -13,7 +13,7 @@ cargo test --workspace
 
 v0.1 targets Linux and macOS; Windows is supported for development and testing only, and private-key file permissions are not enforced there. Native Windows development requires the Visual Studio C++ Build Tools for the Rust linker.
 
-Tested with Git 2.55.0 on Windows and Git 2.56.0 on Ubuntu and macOS. Git 2.34 is the first version with SSH signing, but is untested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
+Tested with Git 2.55.0 on Windows and Git 2.56.0 on Ubuntu and macOS. Git 2.34.1 is known NOT to work: it does not pass `-Overify-time` to `find-principals` and the shim fails closed. Git 2.35.0 is the first version with the fix (source-verified from [git/git gpg-interface.c v2.34.0 vs v2.35.0](https://github.com/git/git/blob/v2.35.0/gpg-interface.c)). Versions between 2.35 and 2.55 are untested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
 
 The M1 backend is the pure-Rust RustCrypto `ml-dsa` crate, pinned in `crates/qsg-core/Cargo.toml`; it requires Rust 1.87 or newer and needs no CMake, C compiler, or manual native-library installation. See [ADR 0001](adr/0001-crypto-backend.md). The workspace's stable toolchain in CI is sufficient.
 
