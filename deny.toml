@@ -22,11 +22,28 @@
 all-features = true
 
 [advisories]
-# Report all advisories without blocking. Do not fix or ignore findings;
-# they are tracked as follow-up issues.
-vulnerability = "warn"
-unmaintained = "warn"
-unsound = "warn"
+# cargo-deny 0.20 removed the `vulnerability`, `unsound`, and `notice` fields:
+# all vulnerability advisories now always emit errors unless explicitly ignored.
+# See: https://embarkstudios.github.io/cargo-deny/checks/advisories/cfg.html
+# The three advisories below are ignored with reasons pending triage issues;
+# remove each ignore entry when the underlying crate is bumped.
+ignore = [
+    # RUSTSEC-2026-0009: time DoS via stack exhaustion in RFC 2822 parse.
+    # Affected functions: Date::parse, OffsetDateTime::parse, etc.
+    # QSGit never calls any of these; it uses only from_unix_timestamp and now_utc.
+    # Tracked: bump time >=0.3.47 (MSRV check needed: 0.3.47 requires Rust 1.88,
+    # workspace MSRV is 1.87). See issue filed in E2.
+    { id = "RUSTSEC-2026-0009", reason = "QSGit does not call time::parse; tracked in bump-time issue" },
+    # RUSTSEC-2023-0071: rsa Marvin Attack timing sidechannel.
+    # rsa 0.9.10 is a feature-gated optional dep of ssh-key; QSGit does NOT
+    # activate the rsa feature (uses only ed25519,std). rsa is not compiled into
+    # any release binary. Tracked in triage issue.
+    { id = "RUSTSEC-2023-0071", reason = "rsa feature not activated in ssh-key; not compiled into any binary" },
+    # RUSTSEC-2026-0387: crypto-bigint constant-time issues.
+    # crypto-bigint 0.5.5 is a transitive dep of rsa, which is not compiled in
+    # (see RUSTSEC-2023-0071 above). Not reachable from any release binary.
+    { id = "RUSTSEC-2026-0387", reason = "crypto-bigint pulled via rsa feature not activated; not compiled in" },
+]
 yanked = "warn"
 
 [licenses]

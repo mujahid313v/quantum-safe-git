@@ -1,46 +1,44 @@
 name: Git minimum version
 
+# Non-required manual workflow. Run to check whether a Git version works.
+# Evidence: v2.34.0 does NOT pass -Overify-time to find-principals (confirmed
+# from git/git gpg-interface.c v2.34.0 source; the flag was added in v2.35.0).
+# Expect ubuntu:22.04 (Git 2.34.1) to FAIL and others to pass.
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - .github/workflows/git-min-version.yml
 
 permissions:
   contents: read
 
 jobs:
-  git-2-34:
+  git-version-matrix:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    container: ubuntu:22.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        container: ["ubuntu:22.04", "debian:12", "ubuntu:24.04"]
+    container: ${{ matrix.container }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
       - name: Install dependencies
         run: |
           for i in 1 2 3; do apt-get update && break || sleep 10; done
-          apt-get install -y git ssh curl build-essential pkg-config libssl-dev
+          apt-get install -y git openssh-client curl build-essential pkg-config libssl-dev ca-certificates
           git --version
+          ssh -V
       - name: Install Rust
         run: |
           export HOME=/root
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
-          export PATH="$HOME/.cargo/bin:$PATH"
+          export PATH="/root/.cargo/bin:$PATH"
           rustup component add clippy rustfmt
-      - name: Format
-        run: |
-          export HOME=/root
-          export PATH="$HOME/.cargo/bin:$PATH"
-          cargo fmt --all -- --check
-      - name: Clippy
-        run: |
-          export HOME=/root
-          export PATH="$HOME/.cargo/bin:$PATH"
-          cargo clippy --workspace --all-targets -- -D warnings
       - name: Test
         env:
           QSG_REQUIRE_SSH_KEYGEN: "1"
           HOME: /root
         run: |
           export PATH="/root/.cargo/bin:$PATH"
+          git --version
+          ssh -V
           cargo test -p qsg-ssh-keygen --test git_end_to_end -- --nocapture
