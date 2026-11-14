@@ -5,7 +5,7 @@ QSGit is experimental and moves in small milestones (see the roadmap in the READ
 ## Setup
 
 - Rust stable, MSRV 1.87: `rustup component add clippy rustfmt`
-- Tested with Git 2.55.0 on Windows and Git 2.56.0 on Ubuntu and macOS. Git 2.34.1 is known NOT to work (it does not pass `-Overify-time` to find-principals; the shim fails closed). Git 2.35.0 is the first version with that fix. Versions between 2.35 and 2.55 are untested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
+- Git 2.55.0 was tested on Windows and Git 2.56.0 on Ubuntu and macOS. Git 2.34.1 is known not to work: it does not pass `-Overify-time` to `find-principals`, so the shim fails closed. Source inspection shows Git 2.35.0 is the first checked release whose `gpg-interface.c` contains `verify-time` ([v2.34.0](https://github.com/git/git/blob/v2.34.0/gpg-interface.c), [v2.35.0](https://github.com/git/git/blob/v2.35.0/gpg-interface.c)); runtime compatibility of 2.35.0 is not established. Git versions 2.35.0 through 2.54.x are otherwise untested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
 - Target platforms for v0.1: Linux and macOS. Development on Windows is possible but not a target; WSL is recommended.
 - Extra tools depend on the crypto backend chosen in ADR 0001 (for liboqs: CMake and a C compiler).
 

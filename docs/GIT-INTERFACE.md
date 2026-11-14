@@ -1,4 +1,4 @@
-﻿# Git interface (verified by the M0 spike)
+# Git interface (verified by the M0 spike)
 
 **Status:** Experimental. No audit. Not for production use.
 
@@ -51,7 +51,8 @@ Observed behavior: Git formats the commit's epoch timestamp in the machine's loc
 
 ## Not verified
 
-- Git 2.34.1 is known NOT to work (does not pass `-Overify-time`; source-verified). Git 2.35.0 is the minimum. Versions between 2.35 and 2.55 are untested. See [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
+- Git 2.34.1 is known not to work (does not pass `-Overify-time`; source-verified). Git 2.35.0 is the first checked release whose `gpg-interface.c` contains `verify-time`, but runtime compatibility is not established. Git 2.55.0 was tested on Windows and Git 2.56.0 on Ubuntu and macOS; versions 2.35.0 through 2.54.x are otherwise untested. See [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
+- Exact exit codes and messages of the shim through Git on Ubuntu and macOS are printed by the 'Shim output (nocapture)' CI step; copying them into the D7 table is pending.
 - Stock OpenSSH wrong-namespace verification through Git using a crafted external signature. The non-reproducibility claim is an inference from Git's normal `git` namespace flow, not a reproduced test; that D7 cell is marked **UNVERIFIED** below.
 - Whether the real-OpenSSH KRL revocation case fails for the right reason on every OS: that test now has a baseline "verify succeeds before the KRL is configured" check (added in M6). See D7 table below for verified per-OS values.
 
@@ -107,7 +108,7 @@ The CI contract probe creates a non-empty revocation file and logs arguments; it
 
 The state matrix did not configure a revocation file and asserts that no logged invocation contains `-r` (**A**). Git appends `-r <file>` only to a principal-matched `verify` call when the configured file exists; it omits `-r` if the file is absent and on the no-principal `check-novalidate` path.
 
-The state call matrix uses real Ed25519 signatures with real `ssh-keygen`, and the Python wrapper logs every argument before executing OpenSSH. All cells below were **VERIFIED** in CI on Git 2.56.0, Ubuntu `Linux 7.0.0-1017-azure` with OpenSSH_9.6p1 Ubuntu-3ubuntu13.20 and macOS `Darwin 25.6.0` with OpenSSH_10.3p1. The Windows 11/Git 2.55.0.windows.5 trusted probe with an existing non-empty file also observed `-r <file>` on each `verify` call, and no `-r` on `find-principals`. The earlier local probe's file did not exist, so its “no `-r`” conclusion was incorrect.
+The state call matrix uses real Ed25519 signatures with real `ssh-keygen`, and the Python wrapper logs every argument before executing OpenSSH. All cells below were **VERIFIED** in CI on Git 2.56.0, Ubuntu `Linux 7.0.0-1017-azure` with OpenSSH_9.6p1 Ubuntu-3ubuntu13.20 and macOS `Darwin 25.6.0` with OpenSSH_10.3p1. The Windows 11/Git 2.55.0.windows.5 trusted probe with an existing non-empty file also observed `-r <file>` on each `verify` call, and no `-r` on `find-principals`. The earlier local probe's file did not exist, so its "no `-r`" conclusion was incorrect.
 
 | D7 Git verification failure | QSGit shim through Git | Stock OpenSSH Ed25519 through Git |
 |---|---|---|

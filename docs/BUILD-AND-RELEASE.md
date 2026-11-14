@@ -13,7 +13,7 @@ cargo test --workspace
 
 v0.1 targets Linux and macOS; Windows is supported for development and testing only, and private-key file permissions are not enforced there. Native Windows development requires the Visual Studio C++ Build Tools for the Rust linker.
 
-Tested with Git 2.55.0 on Windows and Git 2.56.0 on Ubuntu and macOS. Git 2.34.1 is known NOT to work: it does not pass `-Overify-time` to `find-principals` and the shim fails closed. Git 2.35.0 is the first version with the fix (source-verified from [git/git gpg-interface.c v2.34.0 vs v2.35.0](https://github.com/git/git/blob/v2.35.0/gpg-interface.c)). Versions between 2.35 and 2.55 are untested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
+Git 2.55.0 was tested on Windows and Git 2.56.0 on Ubuntu and macOS. Git 2.34.1 is known not to work: it does not pass `-Overify-time` to `find-principals`, so the shim fails closed. Source inspection shows Git 2.35.0 is the first checked release whose `gpg-interface.c` contains `verify-time` ([v2.34.0](https://github.com/git/git/blob/v2.34.0/gpg-interface.c), [v2.35.0](https://github.com/git/git/blob/v2.35.0/gpg-interface.c)); runtime compatibility of 2.35.0 is not established. Git versions 2.35.0 through 2.54.x are otherwise untested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
 
 The M1 backend is the pure-Rust RustCrypto `ml-dsa` crate, pinned in `crates/qsg-core/Cargo.toml`; it requires Rust 1.87 or newer and needs no CMake, C compiler, or manual native-library installation. See [ADR 0001](adr/0001-crypto-backend.md). The workspace's stable toolchain in CI is sufficient.
 
@@ -29,12 +29,12 @@ cargo test --workspace --no-fail-fast
 
 | Workflow | File | Triggers | Required for PR? |
 |---|---|---|---|
-| CI | `.github/workflows/ci.yml` | push to main, PRs | **Yes** — jobs `check (ubuntu-latest)` and `check (macos-latest)` |
+| CI | `.github/workflows/ci.yml` | push to main, PRs | **Yes** - only jobs `check (ubuntu-latest)` and `check (macos-latest)` are required |
 | Supply chain | `.github/workflows/audit.yml` | weekly schedule, workflow_dispatch, PRs touching Cargo.toml/Cargo.lock | No |
 | Git minimum version | `.github/workflows/git-min-version.yml` | workflow_dispatch only | No |
 | Fuzz smoke | `.github/workflows/fuzz.yml` | workflow_dispatch only | No |
 
-The required CI workflow runs on every PR:
+Only the two `check` jobs in `ci.yml` are required PR checks. The required CI workflow runs on every PR:
 1. `cargo fmt --all -- --check`
 2. `cargo clippy --workspace --all-targets -- -D warnings`
 3. Fetch pinned NIST ACVP vectors (`python3 crates/qsg-core/tests/fetch_acvp_vectors.py`)
@@ -45,7 +45,7 @@ The required CI workflow runs on every PR:
 8. `cargo test --workspace --no-fail-fast` (with `QSG_REQUIRE_SSH_KEYGEN=1`)
 9. Shim output (nocapture): `cargo test -p qsg-ssh-keygen --test git_end_to_end -- --nocapture`
 
-The supply-chain workflow installs `cargo-audit 0.22.2` and `cargo-deny 0.20.2` with `--locked` (both MIT OR Apache-2.0). It reports all findings without hiding them. Scheduled workflows consume private-repo GitHub Actions minutes.
+The supply-chain workflow installs `cargo-audit 0.22.2` and `cargo-deny 0.20.2` with `--locked` (both MIT OR Apache-2.0). Run the checks locally with `cargo audit` and `cargo deny check` from the workspace root after installing those tools. The audit job reports all findings in its job summary. Scheduled workflows consume private-repo GitHub Actions minutes.
 
 Fuzzing uses `cargo-fuzz` on nightly Rust. Each fuzz target runs for 60 seconds.
 
