@@ -57,4 +57,5 @@ jobs:
         # dependency tree, and pinning the version makes the binary reproducible.
         run: cargo install cargo-deny --locked --version 0.20.2
       - name: Run cargo deny check
-        run: cargo deny check
+        # Advisories are reported by the separate "audit" job.
+        run: cargo deny check licenses bans sources
