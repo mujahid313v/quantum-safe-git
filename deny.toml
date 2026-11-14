@@ -1,56 +1,27 @@
-# cargo-deny configuration. The allowed license identifiers below are
-# taken from this workspace's local `cargo deny list` output.
+# cargo-deny 0.20 configuration. Run locally with:
+#   cargo deny check licenses bans sources
+# Advisories are reported by the separate "audit" job (cargo audit).
+
 [graph]
-all-features = true
+# Dev-dependencies are test-only and not shipped; cargo audit still covers all of Cargo.lock.
+exclude-dev = true
 
 [advisories]
-# cargo-deny 0.20 removed the `vulnerability`, `unsound`, and `notice` fields:
-# all vulnerability advisories now always emit errors unless explicitly ignored.
-# See: https://embarkstudios.github.io/cargo-deny/checks/advisories/cfg.html
-# The three advisories below are ignored with reasons pending triage issues;
-# remove each ignore entry when the underlying crate is bumped.
-ignore = [
-    # RUSTSEC-2026-0009: time DoS via stack exhaustion in RFC 2822 parse.
-    # Affected functions: Date::parse, OffsetDateTime::parse, etc.
-    # QSGit never calls any of these; it uses only from_unix_timestamp and now_utc.
-    # Tracked: bump time >=0.3.47 (MSRV check needed: 0.3.47 requires Rust 1.88,
-    # workspace MSRV is 1.87). See issue filed in E2.
-    { id = "RUSTSEC-2026-0009", reason = "QSGit does not call time::parse; tracked in bump-time issue" },
-    # RUSTSEC-2023-0071: rsa Marvin Attack timing sidechannel.
-    # rsa 0.9.10 is a feature-gated optional dep of ssh-key; QSGit does NOT
-    # activate the rsa feature (uses only ed25519,std). rsa is not compiled into
-    # any release binary. Tracked in triage issue.
-    { id = "RUSTSEC-2023-0071", reason = "rsa feature not activated in ssh-key; not compiled into any binary" },
-    # RUSTSEC-2026-0387: crypto-bigint constant-time issues.
-    # crypto-bigint 0.5.5 is a transitive dep of rsa, which is not compiled in
-    # (see RUSTSEC-2023-0071 above). Not reachable from any release binary.
-    { id = "RUSTSEC-2026-0387", reason = "crypto-bigint pulled via rsa feature not activated; not compiled in" },
-]
 yanked = "warn"
 
 [licenses]
-allow = [
-    "Apache-2.0",
-    "LGPL-2.1-or-later",
-    "MIT",
-    "Unicode-3.0",
-]
-# How OR-expressions work: cargo-deny passes a package if at least one branch
-# of the OR is in this allow list. AND requires every branch to be satisfied.
-# So "(MIT OR Apache-2.0) AND Unicode-3.0" passes because both MIT and
-# Unicode-3.0 are listed. "MIT OR Apache-2.0 OR LGPL-2.1-or-later" passes
-# because MIT is listed. "BSD-2-Clause OR Apache-2.0 OR MIT" passes because
-# MIT is listed. Every expression in the current lockfile is covered.
-#
-# Private workspace members (no license field) are ignored via the setting below.
-confidence-threshold = 0.8
-private.ignore = true
+# Crates with an OR expression (for example "MIT OR Apache-2.0 OR LGPL-2.1-or-later")
+# are accepted when ONE of their terms is allowed. AND expressions need every term.
+allow = ["Apache-2.0", "MIT", "Unicode-3.0"]
+
+[licenses.private]
+# Workspace crates have no license field.
+ignore = true
 
 [bans]
 multiple-versions = "warn"
-wildcards = "allow"
 
 [sources]
-allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 unknown-registry = "deny"
 unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
