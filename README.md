@@ -10,11 +10,12 @@ An earlier prototype (Dilithium-3, pre-standard parameters) lives on the `legacy
 
 | Item | Status |
 |------|--------|
-| M0-M5b | M0 Git interface through the M5b CLI | Merged and implemented; see details and compatibility limits below |
-| M5a: `qsg keygen`, `qsg pubkey`, Git SSH-signing shim | Merged and implemented; end-to-end tests pass on Windows and Linux/macOS CI |
-| M5b: `qsg trust`, `verify`, `verify-range`, and `doctor` | Merged and implemented; CI passing on Ubuntu and macOS |
-| M6: end-to-end tests, supply-chain checks and CI hardening | Implemented in PR #78, pending merge |
-| M7 | Documentation and security pass | Planned |
+| M0: Git SSH-signing interface spike | Merged and implemented; reproducible call/failure cells verified on Windows, Ubuntu, and macOS; Git 2.34.1 is known not to work |
+| M1-M4 libraries | Merged and implemented; security review/audit remains pending |
+| M5a: key generation, public-key display, and Git shim | Merged and implemented; end-to-end tests pass on Windows and Linux/macOS CI |
+| M5b: trust, standalone verification, and diagnostics | Merged and implemented; CI passes on Ubuntu and macOS |
+| M6: end-to-end tests, supply-chain checks, and CI hardening | Implemented in PR #78, pending merge |
+| M7-M8 | Planned |
 
 M0 through M5b are merged and implemented. M5a adds key generation, public-key display, and a Git signing/verifying shim. M5b adds trust management, standalone object/range verification, and diagnostics. M6 is implemented in PR #78 and is pending merge.
 
