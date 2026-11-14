@@ -12,11 +12,8 @@ yanked = "warn"
 [licenses]
 # Crates with an OR expression (for example "MIT OR Apache-2.0 OR LGPL-2.1-or-later")
 # are accepted when ONE of their terms is allowed. AND expressions need every term.
+# The workspace crates declare license = "Apache-2.0" in their manifests.
 allow = ["Apache-2.0", "MIT", "Unicode-3.0"]
-
-[licenses.private]
-# Workspace crates have no license field.
-ignore = true
 
 [bans]
 multiple-versions = "warn"
