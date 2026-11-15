@@ -1,0 +1,61 @@
+name: Supply chain
+
+# Scheduled workflows consume private-repo Actions minutes.
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - Cargo.toml
+      - Cargo.lock
+      - deny.toml
+      - .github/workflows/audit.yml
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - name: Install Rust
+        run: |
+          rustup update stable
+          rustup default stable
+      - name: Install cargo-audit
+        # cargo-audit 0.22.2 is licensed MIT OR Apache-2.0.
+        # Installing from source increases CI time but --locked pins its
+        # dependency tree, and pinning the version makes the binary reproducible.
+        run: cargo install cargo-audit --locked --version 0.22.2
+      - name: Run cargo audit
+        # continue-on-error: keep until RUSTSEC-2026-0009, RUSTSEC-2023-0071 and
+        # RUSTSEC-2026-0387 triage issues are resolved and their crates bumped.
+        # Remove this flag for release PRs.
+        continue-on-error: true
+        run: |
+          cargo audit 2>&1 | tee audit-output.txt
+          echo "## cargo audit findings" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat audit-output.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  supply-chain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - name: Install Rust
+        run: |
+          rustup update stable
+          rustup default stable
+      - name: Install cargo-deny
+        # cargo-deny 0.20.2 is licensed MIT OR Apache-2.0.
+        # Installing from source increases CI time but --locked pins its
+        # dependency tree, and pinning the version makes the binary reproducible.
+        run: cargo install cargo-deny --locked --version 0.20.2
+      - name: Run cargo deny check
+        # Advisories are reported by the separate "audit" job.
+        run: cargo deny check licenses bans sources

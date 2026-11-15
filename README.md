@@ -10,17 +10,18 @@ An earlier prototype (Dilithium-3, pre-standard parameters) lives on the `legacy
 
 | Item | Status |
 |------|--------|
-| M0: Git SSH-signing interface spike | All reproducible call/failure cells verified on Windows, Ubuntu, and macOS; Git 2.34 remains untested. See [docs/GIT-INTERFACE.md](docs/GIT-INTERFACE.md) |
-| M1–M4 libraries | Implemented; review and security audit pending |
-| M5a: `qsg keygen`, `qsg pubkey`, Git SSH-signing shim | Implemented; end-to-end tests pass on Windows and Linux/macOS CI |
-| M5b: `qsg trust`, `verify`, `verify-range`, and `doctor` | Implemented; final validation and CI pending |
-| M6–M8 | Planned |
+| M0: Git SSH-signing interface spike | Merged and implemented; reproducible call/failure cells verified on Windows, Ubuntu, and macOS; Git 2.34.1 is known not to work |
+| M1-M4 libraries | Merged and implemented; security review/audit remains pending |
+| M5a: key generation, public-key display, and Git shim | Merged and implemented; end-to-end tests pass on Windows and Linux/macOS CI |
+| M5b: trust, standalone verification, and diagnostics | Merged and implemented; CI passes on Ubuntu and macOS |
+| M6: end-to-end tests, supply-chain checks, and CI hardening | Implemented in PR #78, pending merge |
+| M7-M8 | Planned |
 
-M1–M4 library functionality is implemented. M5a adds key generation, public-key display, and a Git signing/verifying shim. M5b adds trust management, standalone object/range verification, and diagnostics; final validation and CI are pending.
+M0 through M5b are merged and implemented. M5a adds key generation, public-key display, and a Git signing/verifying shim. M5b adds trust management, standalone object/range verification, and diagnostics. M6 is implemented in PR #78 and is pending merge.
 
 ## M5a workflow
 
-Git compatibility tested with Git 2.55.0 on Windows and Git 2.56.0 on Ubuntu and macOS. Git 2.34 is the first release with SSH signing, but has not been tested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
+Git 2.55.0 was tested on Windows and Git 2.56.0 on Ubuntu and macOS. Git 2.34.1 is known not to work: it does not pass `-Overify-time` to `find-principals`, so the shim fails closed. Source inspection shows that Git 2.35.0 is the first of the checked releases whose `gpg-interface.c` contains `verify-time` ([v2.34.0](https://github.com/git/git/blob/v2.34.0/gpg-interface.c), [v2.35.0](https://github.com/git/git/blob/v2.35.0/gpg-interface.c)); compatibility of 2.35.0 itself has not been demonstrated by the runtime matrix. Git versions 2.35.0 through 2.54.x are otherwise untested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67). The `qsg doctor` minimum-version text still says 2.34 and is tracked there.
 
 ```bash
 qsg keygen                                   # create an ML-DSA-65 key pair
@@ -51,14 +52,14 @@ v0.1 targets Linux and macOS; Windows is supported for development and testing o
 
 | Milestone | Scope | Status |
 |-----------|-------|--------|
-| M0 | Repo cleanup and Git-interface spike | Partial: trusted call shapes verified on Windows/Linux/macOS; untrusted/expired cross-command matrix remains open |
-| M1 | ML-DSA-65 core (backend chosen by ADR) | Implemented on `m1/core-mldsa`; review pending |
-| M2 | SSHSIG-style format and spec, test vectors | Implemented on `m2/sshsig`; OpenSSH interoperability verified on Windows, Ubuntu, and macOS CI |
-| M3 | Encrypted key storage | Implemented on `m3/keystore`; review pending |
-| M4 | allowed_signers parsing, validity, revocation | Implemented on `m4/trust`; review pending |
-| M5a | `qsg keygen`, `qsg pubkey`, and `qsg-ssh-keygen` Git shim | Implemented; end-to-end tests pass on Windows and Linux/macOS CI |
-| M5b | `trust`, `verify`, `verify-range`, and `doctor` CLI commands | Implemented; final validation and CI pending |
-| M6 | End-to-end tests and CI | Planned |
+| M0 | Repo cleanup and Git-interface spike | Merged and implemented; compatibility limits are documented above |
+| M1 | ML-DSA-65 core (backend chosen by ADR) | Merged and implemented; review pending |
+| M2 | SSHSIG-style format and spec, test vectors | Merged and implemented; OpenSSH interoperability verified on Windows, Ubuntu, and macOS CI |
+| M3 | Encrypted key storage | Merged and implemented; review pending |
+| M4 | allowed_signers parsing, validity, revocation | Merged and implemented; review pending |
+| M5a | `qsg keygen`, `qsg pubkey`, and `qsg-ssh-keygen` Git shim | Merged and implemented; end-to-end tests pass on Windows and Linux/macOS CI |
+| M5b | `trust`, `verify`, `verify-range`, and `doctor` CLI commands | Merged and implemented; CI passing on Ubuntu and macOS |
+| M6 | End-to-end tests and CI | Implemented in PR #78, pending merge; SHA-256 e2e, tampered tag, ACVP pin, supply-chain audit, workflow hardening |
 | M7 | Documentation and security pass | Planned |
 | M8 | v0.1.0 release candidate | Planned |
 

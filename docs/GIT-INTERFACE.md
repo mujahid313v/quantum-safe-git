@@ -1,4 +1,4 @@
-﻿# Git interface (verified by the M0 spike)
+# Git interface (verified by the M0 spike)
 
 **Status:** Experimental. No audit. Not for production use.
 
@@ -6,7 +6,7 @@
 - Windows 11, Git 2.55.0.windows.5, OpenSSH_for_Windows 9.5p2 (LibreSSL 3.8.2); the original M0 wrapper spike also used Git Bash OpenSSH 10.5p1.
 - Ubuntu 24.04 CI, Git 2.56.0, Linux 7.0.0-1017-azure, OpenSSH_9.6p1 Ubuntu-3ubuntu13.20.
 - macOS CI, Git 2.56.0, Darwin 25.6.0, OpenSSH_10.3p1.
-- Git 2.55.0 was tested locally on Windows; Git 2.56.0 was tested in CI on Ubuntu and macOS. Git 2.34 is the first release with SSH signing, but is untested; see issue [#67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
+- Git 2.55.0 was tested locally on Windows; Git 2.56.0 was tested in CI on Ubuntu and macOS. Git 2.34.1 is known not to work: it does not pass `-Overify-time` to `find-principals` (source-verified from [git/git gpg-interface.c v2.34.0](https://github.com/git/git/blob/v2.34.0/gpg-interface.c) vs [v2.35.0](https://github.com/git/git/blob/v2.35.0/gpg-interface.c)); the shim fails closed. Git 2.35.0 is the first checked release whose source contains `verify-time`, but runtime compatibility is not established. Versions 2.35.0 through 2.54.x are otherwise untested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67). The `qsg doctor` minimum text still says 2.34 and is tracked there.
 - Method: (1) a logging wrapper around the real `ssh-keygen`, (2) a fake program returning a dummy armored blob, both set as `gpg.ssh.program`.
 
 - Object formats tested with the real `ssh-keygen`: sha1 and sha256. The calls were identical.
@@ -51,10 +51,10 @@ Observed behavior: Git formats the commit's epoch timestamp in the machine's loc
 
 ## Not verified
 
-- Exact exit codes and messages of the QSGit shim through Git on Ubuntu and macOS: CI runs `cargo test` without `--nocapture`, so only a non-zero exit and message substrings are asserted there. Exact values were observed on Windows only.
-- Whether the real-OpenSSH KRL revocation case fails for the right reason on every OS: that test has no baseline "verify succeeds before the KRL is configured" check yet (tracked in a follow-up issue).
-- Git 2.34 and versions other than Git 2.55.0 and 2.56.0.
+- Git 2.34.1 is known not to work (does not pass `-Overify-time`; source-verified). Git 2.35.0 is the first checked release whose `gpg-interface.c` contains `verify-time`, but runtime compatibility is not established. Git 2.55.0 was tested on Windows and Git 2.56.0 on Ubuntu and macOS; versions 2.35.0 through 2.54.x are otherwise untested. See [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
+- Exact exit codes and messages of the shim through Git on Ubuntu and macOS are printed by the 'Shim output (nocapture)' CI step; copying them into the D7 table is pending.
 - Stock OpenSSH wrong-namespace verification through Git using a crafted external signature. The non-reproducibility claim is an inference from Git's normal `git` namespace flow, not a reproduced test; that D7 cell is marked **UNVERIFIED** below.
+- Whether the real-OpenSSH KRL revocation case fails for the right reason on every OS: that test now has a baseline "verify succeeds before the KRL is configured" check (added in M6). See D7 table below for verified per-OS values.
 
 ## Consequences for QSGit
 - `qsg-ssh-keygen` implements only `sign`, `find-principals` and `verify`; any other `-Y` subcommand exits non-zero with a clear message.
@@ -108,15 +108,15 @@ The CI contract probe creates a non-empty revocation file and logs arguments; it
 
 The state matrix did not configure a revocation file and asserts that no logged invocation contains `-r` (**A**). Git appends `-r <file>` only to a principal-matched `verify` call when the configured file exists; it omits `-r` if the file is absent and on the no-principal `check-novalidate` path.
 
-The state call matrix uses real Ed25519 signatures with real `ssh-keygen`, and the Python wrapper logs every argument before executing OpenSSH. All cells below were **VERIFIED** in CI on Git 2.56.0, Ubuntu `Linux 7.0.0-1017-azure` with OpenSSH_9.6p1 Ubuntu-3ubuntu13.20 and macOS `Darwin 25.6.0` with OpenSSH_10.3p1. The Windows 11/Git 2.55.0.windows.5 trusted probe with an existing non-empty file also observed `-r <file>` on each `verify` call, and no `-r` on `find-principals`. The earlier local probe's file did not exist, so its “no `-r`” conclusion was incorrect.
+The state call matrix uses real Ed25519 signatures with real `ssh-keygen`, and the Python wrapper logs every argument before executing OpenSSH. All cells below were **VERIFIED** in CI on Git 2.56.0, Ubuntu `Linux 7.0.0-1017-azure` with OpenSSH_9.6p1 Ubuntu-3ubuntu13.20 and macOS `Darwin 25.6.0` with OpenSSH_10.3p1. The Windows 11/Git 2.55.0.windows.5 trusted probe with an existing non-empty file also observed `-r <file>` on each `verify` call, and no `-r` on `find-principals`. The earlier local probe's file did not exist, so its "no `-r`" conclusion was incorrect.
 
 | D7 Git verification failure | QSGit shim through Git | Stock OpenSSH Ed25519 through Git |
 |---|---|---|
-| Tampered commit | Exit 1 and stderr as shown (**A:** nonzero + signature error substring; **L:** exact exit/message), Windows 11 Git 2.55.0 and Ubuntu/macOS Git 2.56.0 | Exit 1 and same stderr (**A:** calls + nonzero; **L:** exact output), Ubuntu `Linux 7.0.0-1017-azure` and macOS `Darwin 25.6.0`, Git 2.56.0 |
-| Key absent from `allowed_signers` | Exit 1, stderr `unsupported -Y subcommand: check-novalidate` (**A:** nonzero + substring; **L:** exact exit/message), Windows 11 Git 2.55.0; assertion also ran in CI Git 2.56.0 | Verify-commit/tag exit 1; merge/pull exit 128; log exit 0 (**A:** calls + failure except log; **L:** exact exits/output), Ubuntu/macOS Git 2.56.0 |
-| Expired key (`valid-before` before `GIT_COMMITTER_DATE`) | Exit 1, stderr `unsupported -Y subcommand: check-novalidate` (**A:** nonzero + substring; **L:** exact exit/message), Windows 11 Git 2.55.0; assertion also ran in CI Git 2.56.0 | Same per-command exits as untrusted; expiry message reports verify time 2025-01-01 greater than valid-before 2020-01-01 (**A:** calls + failure except log; **L:** exact exits/output), Ubuntu/macOS Git 2.56.0 |
-| Revoked key | QSG list via env/sibling: exit 1 and `key is revoked` (**A:** failure + substring; **L:** exact exit/message). Existing fingerprint file via `gpg.ssh.revocationFile`: shim exit 255 `unsupported flag -r` (**A:** flag substring; **L:** exit), Windows Git 2.55.0; CI Git 2.56.0 | Ed25519 public key in non-empty OpenSSH KRL: exit 1, stderr `Could not verify signature.`; `ssh-keygen -Q` reports `REVOKED` (**A:** query output, Git failure, wrapper asserts `-r`; **L:** exact Git exit/text), Windows Git 2.55.0 and Ubuntu/macOS Git 2.56.0 |
-| Wrong namespace | Direct crafted signature: exit 255, stderr `invalid signature: unsupported SSHSIG namespace` (**A:** exact status + substring; **L:** exact message), Windows Git 2.55.0; test also runs in CI Git 2.56.0 | **UNVERIFIED (I):** not reproduced through a Git command; conclusion that Git's normal path supplies `git` namespace does not test a crafted external signature |
+| Tampered commit | Exit 1 and stderr as shown (**A:** nonzero + signature error substring; **L:** exact exit/message), Windows 11 Git 2.55.0; VERIFIED Ubuntu Git 2.56.0 (`ubuntu-latest`, CI run bc727c5) and macOS Git 2.56.0 (`macos-latest`, CI run bc727c5): exit=1, stdout="", stderr=`Could not verify signature.\nSignature verification failed: incorrect signature` | Exit 1 and same stderr (**A:** calls + nonzero; **L:** exact output), Ubuntu `Linux 7.0.0-1017-azure` and macOS `Darwin 25.6.0`, Git 2.56.0 |
+| Key absent from `allowed_signers` | Exit 1, stderr `unsupported -Y subcommand: check-novalidate` (**A:** nonzero + substring; **L:** exact exit/message), Windows 11 Git 2.55.0; VERIFIED Ubuntu Git 2.56.0 and macOS Git 2.56.0 (CI run bc727c5): exit=1, stdout="", stderr=`unsupported -Y subcommand: check-novalidate` | Verify-commit/tag exit 1; merge/pull exit 128; log exit 0 (**A:** calls + failure except log; **L:** exact exits/output), Ubuntu/macOS Git 2.56.0 |
+| Expired key (`valid-before` before `GIT_COMMITTER_DATE`) | Exit 1, stderr `unsupported -Y subcommand: check-novalidate` (**A:** nonzero + substring; **L:** exact exit/message), Windows 11 Git 2.55.0; VERIFIED Ubuntu Git 2.56.0 and macOS Git 2.56.0 (CI run bc727c5): exit=1, stdout="", stderr=`unsupported -Y subcommand: check-novalidate` | Same per-command exits as untrusted; expiry message reports verify time 2025-01-01 greater than valid-before 2020-01-01 (**A:** calls + failure except log; **L:** exact exits/output), Ubuntu/macOS Git 2.56.0 |
+| Revoked key | QSG list via env/sibling: exit 1 and `key is revoked` (**A:** failure + substring; **L:** exact exit/message). VERIFIED Ubuntu Git 2.56.0 and macOS Git 2.56.0 (CI run bc727c5): exit=1, stdout="", stderr=`Could not verify signature.\nkey is revoked: SHA256:...`. Existing fingerprint file via `gpg.ssh.revocationFile`: shim exit 1 `unsupported flag -r` (**A:** flag substring; **L:** exit 1); VERIFIED Ubuntu and macOS (CI run bc727c5): exit=1, stdout="", stderr=`unsupported flag -r` | Ed25519 public key in non-empty OpenSSH KRL: exit 1, stderr `Could not verify signature.`; VERIFIED Ubuntu Git 2.56.0 and macOS Git 2.56.0 (CI run bc727c5): exit=1, stdout="", stderr=`Could not verify signature.` (**A:** query output, Git failure, wrapper asserts `-r`; **L:** exact Git exit/text) |
+| Wrong namespace | Direct crafted signature: exit 255, stderr `invalid signature: unsupported SSHSIG namespace` (**A:** exact status + substring; **L:** exact message), Windows 11 Git 2.55.0; VERIFIED Ubuntu Git 2.56.0 and macOS Git 2.56.0 (CI run bc727c5): exit=255, stdout="", stderr=`invalid signature: unsupported SSHSIG namespace` | **UNVERIFIED (I):** not reproduced through a Git command; conclusion that Git's normal path supplies `git` namespace does not test a crafted external signature |
 
 The call-matrix assertions in `tools/spike/git_call_state_matrix.py` include:
 

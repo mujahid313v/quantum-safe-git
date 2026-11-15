@@ -1,7 +1,10 @@
+mod common;
+
 use std::process::Command;
 
 #[test]
 fn keygen_prints_setup_instructions_and_pubkey_reads_the_result() {
+    let _shim = common::shim_path();
     let dir = tempfile::tempdir().unwrap();
     // tempfile follows the process umask; the keystore requires a 0700 key
     // directory on Unix, so make the fixture satisfy that production policy.

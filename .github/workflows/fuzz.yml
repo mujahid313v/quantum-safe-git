@@ -1,0 +1,28 @@
+name: Fuzz smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - name: Install nightly Rust
+        run: |
+          rustup install nightly
+          rustup default nightly
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
+      - name: Fuzz sshsig decode_blob
+        run: |
+          cd crates/qsg-sshsig
+          cargo fuzz run decode_blob -- -max_total_time=60
+      - name: Fuzz trust allowed_signers
+        run: |
+          cd crates/qsg-trust
+          cargo fuzz run allowed_signers -- -max_total_time=60

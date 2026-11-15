@@ -1,3 +1,5 @@
+mod common;
+
 use qsg_keystore::generate;
 use std::fs;
 use std::path::Path;
@@ -19,6 +21,7 @@ fn key(dir: &Path, name: &str) -> (std::path::PathBuf, String) {
 
 #[test]
 fn trust_add_list_revoke_round_trip_preserves_text_and_permissions() {
+    let _shim = common::shim_path();
     let temp = TempDir::new().unwrap();
     #[cfg(unix)]
     {

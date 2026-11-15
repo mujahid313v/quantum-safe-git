@@ -11,6 +11,21 @@ fn tool_exists(name: &str) -> bool {
     Command::new(name).arg("--version").output().is_ok()
 }
 
+/// Require `tools` to exist; panic with a clear message if any are missing and
+/// `QSG_REQUIRE_SSH_KEYGEN=1`, or print a skip message and return `false`.
+fn require_tools(tools: &[&str]) -> bool {
+    let missing: Vec<_> = tools.iter().copied().filter(|t| !tool_exists(t)).collect();
+    if missing.is_empty() {
+        return true;
+    }
+    let message = format!("skipped: {} not found", missing.join(", "));
+    if std::env::var("QSG_REQUIRE_SSH_KEYGEN").as_deref() == Ok("1") {
+        panic!("{message} while QSG_REQUIRE_SSH_KEYGEN=1");
+    }
+    eprintln!("{message}");
+    false
+}
+
 fn git(dir: &Path, args: &[&str]) -> Output {
     git_custom(dir, args, None, None, None)
 }
@@ -161,12 +176,7 @@ fn setup() -> Setup {
 
 #[test]
 fn git_commit_tag_and_verification_failures_work_end_to_end() {
-    if !tool_exists("git") || !tool_exists("ssh-keygen") {
-        let message = "skipped qsg Git integration: git or ssh-keygen is missing";
-        if std::env::var("QSG_REQUIRE_SSH_KEYGEN").as_deref() == Ok("1") {
-            panic!("{message} while QSG_REQUIRE_SSH_KEYGEN=1");
-        }
-        eprintln!("{message}");
+    if !require_tools(&["git", "ssh-keygen"]) {
         return;
     }
     let setup = setup();
@@ -379,12 +389,7 @@ fn git_commit_tag_and_verification_failures_work_end_to_end() {
 
 #[test]
 fn git_openssh_revocation_file_blocks_revoked_ed25519_key() {
-    if !tool_exists("git") || !tool_exists("ssh-keygen") {
-        let message = "skipped OpenSSH Git revocation test: git or ssh-keygen is missing";
-        if std::env::var("QSG_REQUIRE_SSH_KEYGEN").as_deref() == Ok("1") {
-            panic!("{message} while QSG_REQUIRE_SSH_KEYGEN=1");
-        }
-        eprintln!("{message}");
+    if !require_tools(&["git", "ssh-keygen"]) {
         return;
     }
 
@@ -435,6 +440,9 @@ fn git_openssh_revocation_file_blocks_revoked_ed25519_key() {
     success(git(&repo, &["add", "file.txt"]));
     success(git(&repo, &["commit", "-S", "-m", "Ed25519 signed commit"]));
 
+    // Baseline: verification succeeds before the KRL is configured.
+    success(git(&repo, &["verify-commit", "HEAD"]));
+
     let revocations = temp.path().join("revoked.krl");
     let created_krl = Command::new("ssh-keygen")
         .args(["-q", "-k", "-f"])
@@ -479,6 +487,11 @@ fn git_openssh_revocation_file_blocks_revoked_ed25519_key() {
     assert!(
         !result.status.success(),
         "Git accepted an Ed25519 key independently confirmed as revoked by ssh-keygen -Q"
+    );
+    assert!(
+        String::from_utf8_lossy(&result.stderr).contains("Could not verify signature"),
+        "revoked key did not produce 'Could not verify signature' in stderr: {}",
+        String::from_utf8_lossy(&result.stderr)
     );
 }
 
@@ -555,12 +568,7 @@ fn shim_rejects_a_crafted_non_git_namespace_signature() {
 
 #[test]
 fn shim_verification_output_and_exit_codes_are_golden() {
-    if !tool_exists("git") {
-        let message = "skipped shim golden output test: git is missing";
-        if std::env::var("QSG_REQUIRE_SSH_KEYGEN").as_deref() == Ok("1") {
-            panic!("{message} while QSG_REQUIRE_SSH_KEYGEN=1");
-        }
-        eprintln!("{message}");
+    if !require_tools(&["git"]) {
         return;
     }
     let setup = setup();
@@ -680,5 +688,168 @@ fn shim_verification_output_and_exit_codes_are_golden() {
             "Could not verify signature.\nkey is revoked: {}\n",
             public.fingerprint
         )
+    );
+}
+
+// ── SHA-256 repository shim e2e (issue #56) ───────────────────────────────────
+// Tests Git shim sign/verify in a SHA-256 object-format repository.
+// The qsg CLI verify/verify-range tests for SHA-256 live in verify_commands.rs
+// (qsg-cli crate) where CARGO_BIN_EXE_qsg is available.
+#[cfg(unix)]
+#[test]
+fn sha256_repository_shim_sign_and_verify() {
+    if !require_tools(&["git", "ssh-keygen"]) {
+        return;
+    }
+
+    let temp = tempfile::tempdir().unwrap();
+    let keys = temp.path().join("keys");
+    fs::create_dir(&keys).unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions(&keys, fs::Permissions::from_mode(0o700)).unwrap();
+    let key_info = generate(&keys, "sha256key", None, "sha256 test", false, true).unwrap();
+    let public = qsg_keystore::read_public(&key_info.public_path).unwrap();
+    let allowed = temp.path().join("allowed_signers");
+    fs::write(
+        &allowed,
+        format!(
+            "{PRINCIPAL} namespaces=\"git\" ssh-mldsa65@qsgit {}\n",
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &public.blob)
+        ),
+    )
+    .unwrap();
+
+    // Try to create a SHA-256 repository; skip if this Git version lacks support.
+    let repo = temp.path().join("repo256");
+    fs::create_dir(&repo).unwrap();
+    let global_cfg = temp.path().join("global-config");
+    let init_out = Command::new("git")
+        .args(["init", "-q", "--object-format=sha256"])
+        .current_dir(&repo)
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", &global_cfg)
+        .output()
+        .expect("run git");
+    if !init_out.status.success() {
+        let stderr = String::from_utf8_lossy(&init_out.stderr);
+        if std::env::var("QSG_REQUIRE_SSH_KEYGEN").as_deref() == Ok("1") {
+            panic!("sha256 repo init failed while QSG_REQUIRE_SSH_KEYGEN=1: {stderr}");
+        }
+        eprintln!("skipped sha256 shim e2e: git init --object-format=sha256 failed: {stderr}");
+        return;
+    }
+
+    // Assert the repo uses sha256.
+    let fmt_out = Command::new("git")
+        .args(["rev-parse", "--show-object-format"])
+        .current_dir(&repo)
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", &global_cfg)
+        .output()
+        .expect("run git");
+    assert_eq!(
+        String::from_utf8_lossy(&fmt_out.stdout).trim(),
+        "sha256",
+        "repository must use sha256 object format"
+    );
+
+    // Print git version and object format so the nocapture CI step shows them.
+    let ver = Command::new("git")
+        .arg("--version")
+        .output()
+        .expect("run git");
+    eprintln!(
+        "sha256 test env: git={} object-format={}",
+        String::from_utf8_lossy(&ver.stdout).trim(),
+        String::from_utf8_lossy(&fmt_out.stdout).trim()
+    );
+
+    // Helper: run git in the sha256 repo with isolated config.
+    let git256 = |args: &[&str]| -> Output {
+        Command::new("git")
+            .args(args)
+            .current_dir(&repo)
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", &global_cfg)
+            .env("GIT_AUTHOR_NAME", "QSGit test")
+            .env("GIT_AUTHOR_EMAIL", PRINCIPAL)
+            .env("GIT_COMMITTER_NAME", "QSGit test")
+            .env("GIT_COMMITTER_EMAIL", PRINCIPAL)
+            .output()
+            .expect("run git")
+    };
+
+    for (k, v) in [
+        ("user.name", "QSGit test"),
+        ("user.email", PRINCIPAL),
+        ("gpg.format", "ssh"),
+        ("gpg.ssh.program", env!("CARGO_BIN_EXE_qsg-ssh-keygen")),
+        ("user.signingkey", key_info.public_path.to_str().unwrap()),
+        ("gpg.ssh.allowedSignersFile", allowed.to_str().unwrap()),
+    ] {
+        let out = git256(&["config", k, v]);
+        assert!(out.status.success(), "git config {k} failed");
+    }
+
+    fs::write(repo.join("file.txt"), "sha256 content\n").unwrap();
+    success(git256(&["add", "file.txt"]));
+    // Sign a commit in the sha256 repo.
+    let commit_out = git256(&["commit", "-S", "-m", "sha256 signed commit"]);
+    assert!(
+        commit_out.status.success(),
+        "signed commit in sha256 repo failed: {}",
+        String::from_utf8_lossy(&commit_out.stderr)
+    );
+
+    // Assert the commit uses gpgsig-sha256, not gpgsig.
+    let cat_out = git256(&["cat-file", "-p", "HEAD"]);
+    assert!(cat_out.status.success());
+    let commit_text = String::from_utf8_lossy(&cat_out.stdout);
+    assert!(
+        commit_text.contains("gpgsig-sha256"),
+        "sha256 signed commit must use gpgsig-sha256 header"
+    );
+    assert!(
+        !commit_text.contains("\ngpgsig "),
+        "sha256 commit must NOT use gpgsig header"
+    );
+
+    // git verify-commit through the shim.
+    let verify_commit = git256(&["verify-commit", "HEAD"]);
+    assert!(
+        verify_commit.status.success(),
+        "git verify-commit failed in sha256 repo: {}",
+        String::from_utf8_lossy(&verify_commit.stderr)
+    );
+
+    // Sign an annotated tag in the sha256 repo.
+    let tag_out = git256(&["tag", "-s", "-m", "sha256 annotated tag", "sha256-v0"]);
+    assert!(
+        tag_out.status.success(),
+        "signed tag in sha256 repo failed: {}",
+        String::from_utf8_lossy(&tag_out.stderr)
+    );
+
+    // git verify-tag through the shim.
+    let verify_tag = git256(&["verify-tag", "sha256-v0"]);
+    assert!(
+        verify_tag.status.success(),
+        "git verify-tag failed in sha256 repo: {}",
+        String::from_utf8_lossy(&verify_tag.stderr)
+    );
+
+    // Baseline: the same shim works in a sha1 repo (proves test logic).
+    let s = setup();
+    let sha1_fmt = Command::new("git")
+        .args(["rev-parse", "--show-object-format"])
+        .current_dir(&s.repo)
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", s.repo.join("../global-config"))
+        .output()
+        .expect("run git");
+    let fmt = String::from_utf8_lossy(&sha1_fmt.stdout);
+    assert!(
+        fmt.trim() == "sha1" || fmt.trim() == "sha256",
+        "sha1 baseline repo has unexpected format: {fmt}"
     );
 }

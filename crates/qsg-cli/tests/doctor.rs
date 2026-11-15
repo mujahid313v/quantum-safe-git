@@ -1,3 +1,5 @@
+mod common;
+
 use qsg_keystore::generate;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -39,17 +41,7 @@ fn setup() -> Setup {
     )
     .unwrap();
     git(&repo, &global, &["init", "-q"]);
-    let shim = std::env::current_exe()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join(if cfg!(windows) {
-            "qsg-ssh-keygen.exe"
-        } else {
-            "qsg-ssh-keygen"
-        });
+    let shim = common::shim_path();
     for (key, value) in [
         ("gpg.format", "ssh".to_owned()),
         ("gpg.ssh.program", shim.to_string_lossy().into_owned()),

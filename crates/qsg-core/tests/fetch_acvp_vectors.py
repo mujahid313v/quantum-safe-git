@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Fetch a pinned, minimal ML-DSA-65 ACVP subset into ignored target/ data."""
 
+import hashlib
 import json
 from pathlib import Path
 from urllib.request import Request, urlopen
@@ -11,12 +12,36 @@ BASE = f"https://raw.githubusercontent.com/usnistgov/ACVP-Server/{COMMIT}/gen-va
 ROOT = Path(__file__).resolve().parents[3]
 OUT = ROOT / "target" / "acvp" / "ml-dsa65-kat.txt"
 
+# SHA-256 of the raw HTTP response bytes at the pinned commit.
+# To update: change COMMIT, re-run, copy the hashes printed on mismatch.
+SOURCE_SHA256 = {
+    "ML-DSA-keyGen-FIPS204": "e67ee6540d40e11506c3c4e3b1f79fc1cefcd49820db99fc61f87cc8ba463baf",
+    "ML-DSA-sigGen-FIPS204": "72dcaf5f69853ca267ccd16af9cb40949786aca0fcfbf05d1ebeba132b93af22",
+    "ML-DSA-sigVer-FIPS204": "47cdd6314c7f746d02421ffcba89d4dbc7bb875ac49e07a029fdfc26fba55437",
+}
+
+# SHA-256 of the generated output file (LF line endings, ASCII).
+# To update: run `sha256sum target/acvp/ml-dsa65-kat.txt` or
+#   `(Get-FileHash target/acvp/ml-dsa65-kat.txt -Algorithm SHA256).Hash.ToLower()`
+# after re-generating, and paste the hex below (lower-case).
+OUTPUT_SHA256 = "e9130ae5edeab1972c10609c72cde1437920d318064cd6ca3b43dfc52d2f0e95"
+
 
 def load_vector(directory):
     url = f"{BASE}/{directory}/internalProjection.json"
     request = Request(url, headers={"User-Agent": "QSGit-ACVP-test-helper"})
     with urlopen(request, timeout=90) as response:
-        data = json.load(response)
+        raw = response.read()
+    actual = hashlib.sha256(raw).hexdigest()
+    expected = SOURCE_SHA256[directory]
+    if actual != expected:
+        raise RuntimeError(
+            f"Hash mismatch for {directory}/internalProjection.json\n"
+            f"  expected: {expected}\n"
+            f"  actual:   {actual}\n"
+            f"  If the pinned commit changed, update SOURCE_SHA256 in this script."
+        )
+    data = json.loads(raw)
     if (data.get("algorithm"), data.get("revision")) != ("ML-DSA", "FIPS204"):
         raise RuntimeError(f"Unexpected ACVP metadata at {directory}")
     return data
@@ -87,7 +112,7 @@ def main():
     write_section(lines, "sigver_fail", ver_fail, fields)
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text("\n".join(lines) + "\n", encoding="ascii")
+    OUT.write_text("\n".join(lines) + "\n", encoding="ascii", newline="\n")
     # Only metadata and test IDs are printed; vector bytes are never logged.
     print(
         "Fetched pinned NIST ML-DSA-65 ACVP subset: "

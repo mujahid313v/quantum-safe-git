@@ -1,6 +1,6 @@
 # Architecture
 
-**Status: M1-M5b libraries and commands are implemented; M6 and later remain planned. Experimental, unaudited, and not for production use.**
+**Status: M0-M5b are merged and implemented. M6 is implemented in PR #78 and pending merge; M7-M8 remain planned. Experimental, unaudited, and not for production use.**
 
 ## Idea
 
@@ -41,7 +41,7 @@ The same flows serve tags. Nothing needs a network or a service.
 
 ## Planned or out of scope for v0.1
 
-This is the single list; other documents link here.
+M6 is implemented in PR #78 and pending merge. M7 is the documentation and security pass; M8 is the v0.1.0 release candidate. The following product capabilities remain out of scope for v0.1; other documents link here.
 
 - gRPC or other signing service
 - Desktop UI, IDE extensions
@@ -58,8 +58,8 @@ Not goals at all: blockchain, machine-learning anomaly detection, mobile app, ma
 
 ## Platforms
 
-v0.1 targets Linux and macOS; Windows is supported for development and testing only, and private-key file permissions are not enforced there. Tested with Git 2.55.0 on Windows and Git 2.56.0 on Ubuntu and macOS. Git 2.34 is the first version with SSH signing, but is untested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
+v0.1 targets Linux and macOS; Windows is supported for development and testing only, and private-key file permissions are not enforced there. Git 2.55.0 was tested on Windows and Git 2.56.0 on Ubuntu and macOS. Git 2.34.1 is known not to work because it does not pass `-Overify-time` to `find-principals`, so the shim fails closed. Source inspection shows Git 2.35.0 is the first checked release with `verify-time` in `gpg-interface.c`, but runtime compatibility of that release is not established. Versions 2.35.0 through 2.54.x are otherwise untested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
 
 ## SHA-256 repositories
 
-QSGit signs the buffer Git hands over, so it does not depend on the object hash. The spike saw identical calls for sha1 and sha256 repositories. An end-to-end test with a sha256 repository is part of v0.1 (M6).
+QSGit signs the buffer Git hands over, so it does not depend on the object hash. The spike saw identical calls for sha1 and sha256 repositories. M6 adds end-to-end tests with SHA-256 repositories; those tests are implemented in PR #78, pending merge.

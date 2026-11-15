@@ -1,0 +1,24 @@
+# cargo-deny 0.20 configuration. Run locally with:
+#   cargo deny check licenses bans sources
+# Advisories are reported by the separate "audit" job (cargo audit).
+
+[graph]
+# Dev-dependencies are test-only and not shipped; cargo audit still covers all of Cargo.lock.
+exclude-dev = true
+
+[advisories]
+yanked = "warn"
+
+[licenses]
+# Crates with an OR expression (for example "MIT OR Apache-2.0 OR LGPL-2.1-or-later")
+# are accepted when ONE of their terms is allowed. AND expressions need every term.
+# The workspace crates declare license = "Apache-2.0" in their manifests.
+allow = ["Apache-2.0", "MIT", "Unicode-3.0"]
+
+[bans]
+multiple-versions = "warn"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
