@@ -1,3 +1,5 @@
+mod common;
+
 use qsg_keystore::generate;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -51,7 +53,7 @@ fn setup() -> Setup {
         ("user.name", "Verify Test"),
         ("user.email", PRINCIPAL),
         ("gpg.format", "ssh"),
-        ("gpg.ssh.program", shim_path().to_str().unwrap()),
+        ("gpg.ssh.program", common::shim_path().to_str().unwrap()),
         ("gpg.ssh.allowedSignersFile", allowed.to_str().unwrap()),
         ("user.signingkey", first.private_path.to_str().unwrap()),
     ] {
@@ -76,20 +78,6 @@ fn allowed_line_with(blob: &[u8], options: &str) -> String {
         "{PRINCIPAL} namespaces=\"git\"{options} ssh-mldsa65@qsgit {}\n",
         base64::Engine::encode(&base64::engine::general_purpose::STANDARD, blob)
     )
-}
-
-fn shim_path() -> PathBuf {
-    std::env::current_exe()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join(if cfg!(windows) {
-            "qsg-ssh-keygen.exe"
-        } else {
-            "qsg-ssh-keygen"
-        })
 }
 
 fn git(repo: &Path, args: &[&str]) -> String {
@@ -933,7 +921,7 @@ fn sha256_repository_qsg_verify_and_verify_range() {
         ("user.name", "Verify Test"),
         ("user.email", PRINCIPAL),
         ("gpg.format", "ssh"),
-        ("gpg.ssh.program", shim_path().to_str().unwrap()),
+        ("gpg.ssh.program", common::shim_path().to_str().unwrap()),
         ("user.signingkey", key_info.private_path.to_str().unwrap()),
         ("gpg.ssh.allowedSignersFile", allowed.to_str().unwrap()),
     ] {
