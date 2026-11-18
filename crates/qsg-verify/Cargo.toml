@@ -9,4 +9,4 @@ rust-version.workspace = true
 qsg-keystore = { path = "../qsg-keystore" }
 qsg-sshsig = { path = "../qsg-sshsig" }
 qsg-trust = { path = "../qsg-trust" }
-time = { version = "=0.3.44", default-features = false, features = ["local-offset"] }
+time = { version = "=0.3.47", default-features = false, features = ["local-offset"] }
