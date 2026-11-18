@@ -15,7 +15,7 @@ A local civil time during a daylight-saving fall-back can identify two UTC insta
 
 | Crate | Exact version | License | Maintenance and audit status | Use |
 |---|---:|---|---|---|
-| [`time`](https://docs.rs/crate/time/0.3.44) | `0.3.44` | MIT OR Apache-2.0 | Upstream-maintained; no independent security audit of this exact release identified. Declares Rust 1.81, compatible with workspace MSRV 1.87. Default features disabled; only `local-offset` enabled (which implies `std`). | Local UTC-offset lookup only in `qsg-ssh-keygen`. |
+| [`time`](https://docs.rs/crate/time/0.3.44) | `0.3.44` | MIT OR Apache-2.0 | Upstream-maintained; no independent security audit of this exact release identified. Declares Rust 1.81, compatible with workspace MSRV 1.88. Default features disabled; only `local-offset` enabled (which implies `std`). | Local UTC-offset lookup only in `qsg-ssh-keygen`. |
 | [`rpassword`](https://docs.rs/crate/rpassword/7.5.4) | `7.5.4` | Apache-2.0 | Upstream-maintained; release history includes 7.5.4 dated 2026-05-31. No independent security audit identified. | No-echo passphrase input from the terminal in `qsg` and the Git shim. |
 
 Additional packages introduced transitively by these dependencies in the M5a lockfile diff are listed here. Licenses are from `cargo metadata` package metadata; no independent audit evidence was identified for these exact versions.
@@ -29,7 +29,7 @@ Additional packages introduced transitively by these dependencies in the M5a loc
 | [`rtoolbox`](https://crates.io/crates/rtoolbox/0.0.6) | `0.0.6` | Apache-2.0 | No independent audit evidence identified. |
 | [`time-core`](https://crates.io/crates/time-core/0.1.6) | `0.1.6` | MIT OR Apache-2.0 | No independent audit evidence identified. |
 
-Both exact versions are pinned in Cargo manifests. They were not already in the workspace lockfile. The `time` version is pinned below the newest release to preserve the declared Rust 1.87 minimum. Both tools use hand-written argument parsing: the shim accepts only Git's three documented command shapes, and `qsg` currently has only two commands; adding a general parser dependency is not justified for these narrow interfaces.
+Both exact versions are pinned in Cargo manifests. They were not already in the workspace lockfile. The `time` version is pinned below the newest release to preserve the declared Rust 1.88 minimum. Both tools use hand-written argument parsing: the shim accepts only Git's three documented command shapes, and `qsg` currently has only two commands; adding a general parser dependency is not justified for these narrow interfaces.
 
 ## Alternatives
 
