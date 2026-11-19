@@ -50,9 +50,9 @@ fn sha256_bytes(data: &[u8]) -> String {
         msg.push(0);
     }
     msg.extend_from_slice(&bit_len.to_be_bytes());
-    for chunk in msg.chunks_exact(64) {
+    for chunk in msg.as_chunks::<64>().0 {
         let mut w = [0u32; 64];
-        for (i, b) in chunk.chunks_exact(4).enumerate().take(16) {
+        for (i, b) in chunk.as_chunks::<4>().0.iter().enumerate().take(16) {
             w[i] = u32::from_be_bytes([b[0], b[1], b[2], b[3]]);
         }
         for i in 16..64 {
@@ -127,7 +127,9 @@ fn hex_bytes(fields: &HashMap<String, String>, key: &str) -> Vec<u8> {
     assert_eq!(encoded.len() % 2, 0, "invalid hex length for {key}");
     encoded
         .as_bytes()
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|pair| {
             let digit = |byte: u8| match byte {
                 b'0'..=b'9' => byte - b'0',

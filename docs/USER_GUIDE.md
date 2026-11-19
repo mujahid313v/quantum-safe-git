@@ -6,7 +6,7 @@
 
 - Tested with Git 2.55.0 on Windows and Git 2.56.0 on Ubuntu and macOS. Git 2.34 is the first version with SSH signing, but is untested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
 - v0.1 targets Linux and macOS; Windows is supported for development and testing only, and private-key file permissions are not enforced there.
-- Rust 1.87 or newer to build from source.
+- Rust 1.88 or newer to build from source.
 
 ## Build and install
 

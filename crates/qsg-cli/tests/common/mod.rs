@@ -34,22 +34,21 @@ fn resolve_shim() -> Result<PathBuf, String> {
         }
     }
 
-    if let Some(qsg) = cargo_bin_qsg.as_deref() {
-        if let Some(parent) = qsg.parent() {
-            if let Some(found) = existing_candidate(parent.join(executable), &mut tried) {
-                return Ok(found);
-            }
-        }
+    if let Some(qsg) = cargo_bin_qsg.as_deref()
+        && let Some(parent) = qsg.parent()
+        && let Some(found) = existing_candidate(parent.join(executable), &mut tried)
+    {
+        return Ok(found);
     }
 
     let profile_candidate = current_exe
         .as_deref()
         .and_then(profile_dir_from_current_exe)
         .map(|profile| profile.join(executable));
-    if let Some(path) = profile_candidate {
-        if let Some(found) = existing_candidate(path, &mut tried) {
-            return Ok(found);
-        }
+    if let Some(path) = profile_candidate
+        && let Some(found) = existing_candidate(path, &mut tried)
+    {
+        return Ok(found);
     }
 
     let build_output = build_shim();

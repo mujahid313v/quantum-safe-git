@@ -232,10 +232,10 @@ pub fn read_public(path: impl AsRef<Path>) -> Result<PublicKeyInfo> {
 pub fn default_config_dir() -> Result<PathBuf> {
     #[cfg(unix)]
     {
-        if let Some(xdg) = std::env::var_os("XDG_CONFIG_HOME") {
-            if !xdg.is_empty() {
-                return Ok(PathBuf::from(xdg).join("qsgit"));
-            }
+        if let Some(xdg) = std::env::var_os("XDG_CONFIG_HOME")
+            && !xdg.is_empty()
+        {
+            return Ok(PathBuf::from(xdg).join("qsgit"));
         }
         return Ok(
             PathBuf::from(std::env::var_os("HOME").ok_or(Error::InvalidHeader)?)
