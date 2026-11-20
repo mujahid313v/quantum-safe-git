@@ -4,6 +4,18 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+const TESTED_GIT_VERSIONS: &[(u32, u32, u32)] =
+    &[(2, 39, 5), (2, 43, 0), (2, 55, 0), (2, 56, 0), (2, 56, 1)];
+
+#[derive(Debug, PartialEq, Eq)]
+enum GitVersionStatus {
+    Unparseable,
+    Unsupported,
+    RuntimeUntested,
+    Tested,
+    NewerUntested,
+}
+
 pub fn run() -> Result<(), String> {
     let mut errors = false;
     let mut report = |level: &str, message: String| {
@@ -18,21 +30,25 @@ pub fn run() -> Result<(), String> {
         None => report("ERROR", "git was not found on PATH".into()),
         Some(version) => {
             println!("INFO: {version}");
-            if let Some((major, minor)) = version.split_whitespace().last().and_then(parse_version)
-            {
-                if (major, minor) < (2, 34) {
-                    report(
-                        "WARN",
-                        "Git is older than 2.34; SSH signing is unavailable".into(),
-                    );
-                } else if !matches!((major, minor), (2, 55) | (2, 56)) {
-                    report(
-                        "WARN",
-                        "Git version is not among the tested versions 2.55.0 and 2.56.0".into(),
-                    );
+            match classify_git_version(&version) {
+                GitVersionStatus::Unparseable => {
+                    report("WARN", "could not parse Git version".into())
                 }
-            } else {
-                report("WARN", "could not parse Git version".into());
+                GitVersionStatus::Unsupported => report(
+                    "ERROR",
+                    "QSGit cannot verify signatures with this Git: it does not pass -Overify-time"
+                        .into(),
+                ),
+                GitVersionStatus::RuntimeUntested => report(
+                    "WARN",
+                    "source supports verify-time; runtime support untested".into(),
+                ),
+                GitVersionStatus::Tested => {
+                    println!("INFO: Git version is in the tested-version list")
+                }
+                GitVersionStatus::NewerUntested => println!(
+                    "INFO: Git version is newer than the newest tested version; not yet tested"
+                ),
             }
         }
     }
@@ -249,9 +265,68 @@ fn git_config(key: &str, global: bool) -> Option<String> {
     }
 }
 
-fn parse_version(text: &str) -> Option<(u32, u32)> {
-    let mut parts = text.split('.');
-    Some((parts.next()?.parse().ok()?, parts.next()?.parse().ok()?))
+fn classify_git_version(text: &str) -> GitVersionStatus {
+    let Some(version) = parse_git_version(text) else {
+        return GitVersionStatus::Unparseable;
+    };
+    if version < (2, 35, 0) {
+        GitVersionStatus::Unsupported
+    } else if TESTED_GIT_VERSIONS.contains(&version) {
+        GitVersionStatus::Tested
+    } else if TESTED_GIT_VERSIONS
+        .iter()
+        .copied()
+        .max()
+        .is_some_and(|newest| version > newest)
+    {
+        GitVersionStatus::NewerUntested
+    } else {
+        GitVersionStatus::RuntimeUntested
+    }
+}
+
+fn parse_git_version(text: &str) -> Option<(u32, u32, u32)> {
+    let bytes = text.as_bytes();
+    for start in 0..bytes.len() {
+        if !bytes[start].is_ascii_digit() || (start > 0 && bytes[start - 1].is_ascii_digit()) {
+            continue;
+        }
+        let mut cursor = start;
+        let Some(major) = parse_version_component(bytes, &mut cursor) else {
+            continue;
+        };
+        if bytes.get(cursor) != Some(&b'.') {
+            continue;
+        }
+        cursor += 1;
+        let Some(minor) = parse_version_component(bytes, &mut cursor) else {
+            continue;
+        };
+        if bytes.get(cursor) != Some(&b'.') {
+            continue;
+        }
+        cursor += 1;
+        let Some(patch) = parse_version_component(bytes, &mut cursor) else {
+            continue;
+        };
+        return Some((major, minor, patch));
+    }
+    None
+}
+
+fn parse_version_component(bytes: &[u8], cursor: &mut usize) -> Option<u32> {
+    let start = *cursor;
+    while bytes.get(*cursor).is_some_and(u8::is_ascii_digit) {
+        *cursor += 1;
+    }
+    (start != *cursor)
+        .then(|| {
+            std::str::from_utf8(&bytes[start..*cursor])
+                .ok()?
+                .parse()
+                .ok()
+        })
+        .flatten()
 }
 
 fn resolve_executable(program: &str) -> Option<PathBuf> {
