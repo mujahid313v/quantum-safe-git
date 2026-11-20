@@ -5,9 +5,9 @@ QSGit is experimental and moves in small milestones (see the roadmap in the READ
 ## Setup
 
 - Rust stable, MSRV 1.88: `rustup component add clippy rustfmt`
-- Git 2.55.0 was tested on Windows and Git 2.56.0 on Ubuntu and macOS. Git 2.34.1 is known not to work: it does not pass `-Overify-time` to `find-principals`, so the shim fails closed. Source inspection shows Git 2.35.0 is the first checked release whose `gpg-interface.c` contains `verify-time` ([v2.34.0](https://github.com/git/git/blob/v2.34.0/gpg-interface.c), [v2.35.0](https://github.com/git/git/blob/v2.35.0/gpg-interface.c)); runtime compatibility of 2.35.0 is not established. Git versions 2.35.0 through 2.54.x are otherwise untested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
+- Git versions with passing runtime evidence: 2.39.5 (Debian 12), 2.43.0 (Ubuntu 24.04), 2.55.0 (Windows 11), 2.56.0 (earlier Ubuntu/macOS CI), and 2.56.1 (latest Ubuntu/macOS CI). Ubuntu 22.04 with Git 2.34.1 failed because Git does not pass `-Overify-time` to `find-principals`; the shim fails closed. Git 2.35.0 is the first checked release whose source contains `verify-time`, but runtime support is unverified. Versions without passing evidence are untested; see [docs/GIT-INTERFACE.md](docs/GIT-INTERFACE.md) and [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
 - Target platforms for v0.1: Linux and macOS. Development on Windows is possible but not a target; WSL is recommended.
-- Extra tools depend on the crypto backend chosen in ADR 0001 (for liboqs: CMake and a C compiler).
+- The backend is pure Rust; no CMake or native crypto library is required. Native Windows builds require the Visual Studio C++ Build Tools for the Rust linker.
 
 ## Before you open a pull request
 
@@ -15,8 +15,9 @@ QSGit is experimental and moves in small milestones (see the roadmap in the READ
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace --no-fail-fast
-Supply-chain checks (`cargo audit`, `cargo deny`) run in `.github/workflows/audit.yml` on a schedule and on pull requests that change `Cargo.toml` or `Cargo.lock`; they are not required checks. Please look at their output when you add or update a dependency.
 ```
+
+Supply-chain checks (`cargo audit`, `cargo deny`) run in `.github/workflows/audit.yml` and are not required PR checks. Run `cargo audit` and `cargo deny check licenses bans sources` locally when changing dependencies; review and report all findings.
 
 ## Rules for cryptographic code
 
@@ -36,9 +37,9 @@ Supply-chain checks (`cargo audit`, `cargo deny`) run in `.github/workflows/audi
 ## Licensing
 
 By contributing you agree that your contribution is licensed under Apache-2.0. The DCO sign-off certifies you have the right to submit it.
-Third-party licences are tracked in THIRD-PARTY.md (to be generated with cargo-about or cargo-deny; TODO).
+Third-party licenses and regeneration commands are listed in [THIRD-PARTY.md](THIRD-PARTY.md).
 The M1 backend is RustCrypto `ml-dsa` (Apache-2.0 OR MIT); see [ADR 0001](docs/adr/0001-crypto-backend.md). The backend decision resolves the earlier liboqs/`oqs` licence TODO.
 
 ## Code of conduct
 
-TODO: add CODE_OF_CONDUCT.md.
+Please read the [Code of Conduct](CODE_OF_CONDUCT.md). For conduct reports, contact the maintainer through GitHub at `mujahid313v`.

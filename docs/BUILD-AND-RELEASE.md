@@ -13,7 +13,7 @@ cargo test --workspace
 
 v0.1 targets Linux and macOS; Windows is supported for development and testing only, and private-key file permissions are not enforced there. Native Windows development requires the Visual Studio C++ Build Tools for the Rust linker.
 
-Git 2.55.0 was tested on Windows and Git 2.56.0 on Ubuntu and macOS. Git 2.34.1 is known not to work: it does not pass `-Overify-time` to `find-principals`, so the shim fails closed. Source inspection shows Git 2.35.0 is the first checked release whose `gpg-interface.c` contains `verify-time` ([v2.34.0](https://github.com/git/git/blob/v2.34.0/gpg-interface.c), [v2.35.0](https://github.com/git/git/blob/v2.35.0/gpg-interface.c)); runtime compatibility of 2.35.0 is not established. Git versions 2.35.0 through 2.54.x are otherwise untested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
+Runtime-tested Git versions with passing evidence are 2.39.5 (Debian 12), 2.43.0 (Ubuntu 24.04), 2.55.0 (Windows 11), 2.56.0 (earlier Ubuntu/macOS CI), and 2.56.1 (latest Ubuntu/macOS CI). The manual container results are: `ubuntu:22.04`, Git 2.34.1, **FAIL** because Git does not pass `-Overify-time` to `find-principals`; `debian:12`, Git 2.39.5, **PASS**; `ubuntu:24.04`, Git 2.43.0, **PASS**. Git 2.35.0 is the first checked release whose source contains `verify-time`; this does not prove runtime compatibility. Versions without passing evidence are untested. See [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
 
 The M1 backend is the pure-Rust RustCrypto `ml-dsa` crate, pinned in `crates/qsg-core/Cargo.toml`; it requires Rust 1.88 or newer and needs no CMake, C compiler, or manual native-library installation. See [ADR 0001](adr/0001-crypto-backend.md). The workspace's stable toolchain in CI is sufficient.
 
@@ -33,6 +33,7 @@ cargo test --workspace --no-fail-fast
 | Supply chain | `.github/workflows/audit.yml` | weekly schedule, workflow_dispatch, PRs touching Cargo.toml/Cargo.lock | No |
 | Git minimum version | `.github/workflows/git-min-version.yml` | workflow_dispatch only | No |
 | Fuzz smoke | `.github/workflows/fuzz.yml` | workflow_dispatch only | No |
+| Quickstart smoke | `.github/workflows/quickstart.yml` | workflow_dispatch, selected README/guide/script/workflow pull requests | No |
 
 Only the two `check` jobs in `ci.yml` are required PR checks. The required CI workflow runs on every PR:
 1. `cargo fmt --all -- --check`
@@ -47,7 +48,32 @@ Only the two `check` jobs in `ci.yml` are required PR checks. The required CI wo
 
 The supply-chain workflow installs `cargo-audit 0.22.2` and `cargo-deny 0.20.2` with `--locked` (both MIT OR Apache-2.0). Run the checks locally with `cargo audit` and `cargo deny check` from the workspace root after installing those tools. The audit job reports all findings in its job summary. Scheduled workflows consume private-repo GitHub Actions minutes.
 
-Fuzzing uses `cargo-fuzz` on nightly Rust. Each fuzz target runs for 60 seconds.
+The fuzz workflow uses `cargo-fuzz` on nightly Rust with a 60-second limit per target. Latest fuzz results: pending: evidence not provided (`%TEMP%\\fuzz.txt` was absent).
+
+### Third-party license inventory
+
+Regenerate the shipped dependency output for the Linux and macOS release targets, then deduplicate by crate, version, and license:
+
+```bash
+cargo tree -p qsg -e normal,build --target x86_64-unknown-linux-gnu --prefix none --format "{p}|{l}" --offline --locked
+cargo tree -p qsg-ssh-keygen -e normal,build --target x86_64-unknown-linux-gnu --prefix none --format "{p}|{l}" --offline --locked
+cargo tree -p qsg -e normal,build --target aarch64-apple-darwin --prefix none --format "{p}|{l}" --offline --locked
+cargo tree -p qsg-ssh-keygen -e normal,build --target aarch64-apple-darwin --prefix none --format "{p}|{l}" --offline --locked
+```
+
+To regenerate the complete workspace test dependency closure, include normal, build, and dev edges for all targets, deduplicate the output, and subtract the shipped table in [THIRD-PARTY.md](../THIRD-PARTY.md):
+
+```bash
+cargo tree --workspace -e all --target all --prefix none --format "{p}|{l}" --offline --locked
+```
+
+For a direct dev-edge listing, also run:
+
+```bash
+cargo tree --workspace -e dev --prefix none --format "{p}|{l}" --offline --locked
+```
+
+The shorter `-e dev` form prints dev-dependency edges but omits their normal/build transitive closure in this workspace, so it is not sufficient by itself for a complete dev-only inventory. All commands use Cargo's `{p}` package and `{l}` license format fields.
 
 ## Versioning
 

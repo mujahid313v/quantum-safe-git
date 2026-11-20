@@ -35,7 +35,7 @@ The CI example in [USER_GUIDE.md](USER_GUIDE.md) uses `git show <base>:<path>` t
 
 ## Validity windows and time
 
-Git passes `-Overify-time=YYYYMMDDHHMMSS` derived from the commit's timestamp. The M4 logging-wrapper experiment verified that Git formats this value in the machine's local time, independently of the commit's recorded UTC offset, and does not append `Z`. This was tested locally on Windows with Git 2.55.0.windows.5 and in CI on Linux and macOS with Git 2.56.0; on both Unix systems it was tested under UTC, Asia/Kolkata, and America/Los_Angeles. The timestamp is still chosen by the commit author: a stolen key can backdate signed commits into a validity window. Validity windows limit honest mistakes, not a determined attacker with the key.
+Git passes `-Overify-time=YYYYMMDDHHMMSS` derived from the commit's timestamp. The M4 logging-wrapper experiment verified that Git formats this value in the machine's local time, independently of the commit's recorded UTC offset, and does not append `Z`. This was tested locally on Windows with Git 2.55.0.windows.5 and in CI on Linux and macOS with Git 2.56.0; on both Unix systems it was tested under UTC, Asia/Kolkata, and America/Los_Angeles. Later runtime evidence includes passing Git 2.39.5 (Debian 12), 2.43.0 (Ubuntu 24.04), and 2.56.1 (latest Ubuntu/macOS CI); see [GIT-INTERFACE.md](GIT-INTERFACE.md) for the tested-version list. The timestamp is still chosen by the commit author: a stolen key can backdate signed commits into a validity window. Validity windows limit honest mistakes, not a determined attacker with the key.
 
 ## Rotation
 

@@ -25,6 +25,9 @@
 | Misconfigured Git revocation file | Git may pass `-r <file>` to the custom verifier | M5a rejects `-r` with exit 255, so verification fails closed. Do not set `gpg.ssh.revocationFile` with QSGit; use `QSG_REVOKED_KEYS` or sibling `revoked_keys`. Deliberate v0.1 limitation; support for a QSGit list via `-r` may be added later. |
 | Allowed-signers file editor | Malicious principal/key/date input or interrupted replacement | M5b validates through `qsg-trust`, bounds inputs, preserves unrelated lines, rejects duplicates, and writes a same-directory synced temporary file before rename; not audited. |
 | Trust-file substitution in verify-range | A change supplies its own trusted key file | M5b compares the bytes actually used against tracked base/head blobs and fails closed on a difference unless explicitly overridden; external/untracked files remain caller-controlled; not audited. |
+| Argument injection through revision values | A revision begins with an option-like value | `qsg` rejects option-prefixed revisions before invoking Git; `revision_option_injection_is_usage_error` covers this behavior. |
+| Altered annotated tags | A tag object or signature is changed after signing | `tampered_annotated_tag_fails_qsg_verification` checks altered tag message and signature armor, each against a successful unaltered baseline. |
+| Unreviewed ML-DSA backend | Backend defects may affect every signature | RustCrypto `ml-dsa` 0.1.2 is pre-1.0 and has not had an independent audit; see [ADR 0001](adr/0001-crypto-backend.md). |
 | Incomplete history or empty range in CI | A shallow clone or incorrect base can omit commits | M5b fails unresolved/missing objects closed and offers `--fail-on-empty`; root commits are not included when used as the exclusive range base; not audited. |
 
 ## Mitigations currently implemented
@@ -34,3 +37,11 @@
 - `qsg-trust` enforces exact principals, required Git namespace, bounded parsing, validity windows, and fingerprint revocation; this implementation has not been audited.
 - M5a `qsg-ssh-keygen` prompts for encrypted-key passphrases from the terminal, bounds verification input, rejects unsupported Git call shapes, and connects signature verification with trust checks; it has not been audited.
 - M5b `qsg verify`, `verify-range`, `trust`, and `doctor` reuse the shared verification and trust parsers; the file editor and range trust-source safeguard have not been audited.
+
+## Known limitations
+
+- Revocations have no effective date: a revoked key also invalidates its older signatures.
+- Trusted principals are not bound to commit author identities.
+- The shim rejects Git's `-r` revocation-file option and `check-novalidate` fallback; verification fails closed in those paths.
+- Unix key-file permissions are enforced; Windows key permissions are not enforced.
+- Argon2id working memory is not wiped when freed; see the disclosure row above.

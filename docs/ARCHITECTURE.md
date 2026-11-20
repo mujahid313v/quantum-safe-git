@@ -1,6 +1,6 @@
 # Architecture
 
-**Status: M0-M5b are merged and implemented. M6 is implemented in PR #78 and pending merge; M7-M8 remain planned. Experimental, unaudited, and not for production use.**
+**Status: M0-M6.1 are merged and implemented. M7 documentation and security work is in review; M8 is planned. Experimental, unaudited, and not for production use.**
 
 ## Idea
 
@@ -41,7 +41,7 @@ The same flows serve tags. Nothing needs a network or a service.
 
 ## Planned or out of scope for v0.1
 
-M6 is implemented in PR #78 and pending merge. M7 is the documentation and security pass; M8 is the v0.1.0 release candidate. The following product capabilities remain out of scope for v0.1; other documents link here.
+M6 (PR #78) and M6.1 (PR #84) are merged. M7 is the documentation and security pass and is in review; M8 is the v0.1.0 release candidate. The following product capabilities remain out of scope for v0.1; other documents link here.
 
 - gRPC or other signing service
 - Desktop UI, IDE extensions
@@ -58,8 +58,8 @@ Not goals at all: blockchain, machine-learning anomaly detection, mobile app, ma
 
 ## Platforms
 
-v0.1 targets Linux and macOS; Windows is supported for development and testing only, and private-key file permissions are not enforced there. Git 2.55.0 was tested on Windows and Git 2.56.0 on Ubuntu and macOS. Git 2.34.1 is known not to work because it does not pass `-Overify-time` to `find-principals`, so the shim fails closed. Source inspection shows Git 2.35.0 is the first checked release with `verify-time` in `gpg-interface.c`, but runtime compatibility of that release is not established. Versions 2.35.0 through 2.54.x are otherwise untested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
+v0.1 targets Linux and macOS; Windows is supported for development and testing only, and private-key file permissions are not enforced there. Runtime-tested Git versions with passing evidence are 2.39.5 (Debian 12), 2.43.0 (Ubuntu 24.04), 2.55.0 (Windows 11), 2.56.0 (earlier Ubuntu/macOS CI), and 2.56.1 (latest Ubuntu/macOS CI). Ubuntu 22.04 with Git 2.34.1 failed because Git does not pass `-Overify-time` to `find-principals`, so the shim fails closed. Git 2.35.0 is the first checked release whose source contains `verify-time`, but runtime compatibility is unverified. Versions without passing evidence are untested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
 
 ## SHA-256 repositories
 
-QSGit signs the buffer Git hands over, so it does not depend on the object hash. The spike saw identical calls for sha1 and sha256 repositories. M6 adds end-to-end tests with SHA-256 repositories; those tests are implemented in PR #78, pending merge.
+QSGit signs the buffer Git hands over, so it does not depend on the object hash. The spike saw identical calls for sha1 and sha256 repositories. M6 added end-to-end tests with SHA-256 repositories; the tests are merged in PR #78.
