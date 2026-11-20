@@ -400,3 +400,71 @@ fn check_key_file(key: &str, report: &mut impl FnMut(&str, String)) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{GitVersionStatus, classify_git_version, parse_git_version};
+
+    #[test]
+    fn parses_and_classifies_git_version_strings() {
+        let cases = [
+            (
+                "git version 2.34.0",
+                Some((2, 34, 0)),
+                GitVersionStatus::Unsupported,
+            ),
+            (
+                "git version 2.34.1",
+                Some((2, 34, 1)),
+                GitVersionStatus::Unsupported,
+            ),
+            (
+                "git version 2.35.0",
+                Some((2, 35, 0)),
+                GitVersionStatus::RuntimeUntested,
+            ),
+            (
+                "git version 2.43.0",
+                Some((2, 43, 0)),
+                GitVersionStatus::Tested,
+            ),
+            (
+                "git version 2.55.0",
+                Some((2, 55, 0)),
+                GitVersionStatus::Tested,
+            ),
+            (
+                "git version 2.55.0.windows.5",
+                Some((2, 55, 0)),
+                GitVersionStatus::Tested,
+            ),
+            (
+                "git version 2.56.0",
+                Some((2, 56, 0)),
+                GitVersionStatus::Tested,
+            ),
+            (
+                "git version 2.56.1",
+                Some((2, 56, 1)),
+                GitVersionStatus::Tested,
+            ),
+            (
+                "git version 2.99.0",
+                Some((2, 99, 0)),
+                GitVersionStatus::NewerUntested,
+            ),
+            (
+                "git version 2.39.5 (Apple Git-154)",
+                Some((2, 39, 5)),
+                GitVersionStatus::Tested,
+            ),
+            ("garbage", None, GitVersionStatus::Unparseable),
+            ("", None, GitVersionStatus::Unparseable),
+        ];
+
+        for (text, parsed, status) in cases {
+            assert_eq!(parse_git_version(text), parsed, "input: {text:?}");
+            assert_eq!(classify_git_version(text), status, "input: {text:?}");
+        }
+    }
+}
