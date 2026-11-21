@@ -5,6 +5,9 @@ repo_root="$(git rev-parse --show-toplevel)"
 tmp_root="$(mktemp -d)"
 trap 'rm -rf "$tmp_root"' EXIT
 
+# Keep rustup and Cargo pointed at the installed toolchain/cache after HOME is isolated.
+export RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}"
+export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
 export HOME="$tmp_root/home"
 export XDG_CONFIG_HOME="$HOME/.config"
 export GIT_CONFIG_GLOBAL="$tmp_root/gitconfig"
