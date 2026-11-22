@@ -1,0 +1,29 @@
+name: Quickstart smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - README.md
+      - docs/USER_GUIDE.md
+      - tools/quickstart-smoke.sh
+      - .github/workflows/quickstart.yml
+
+permissions:
+  contents: read
+
+jobs:
+  quickstart:
+    name: quickstart (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Update stable Rust
+        run: rustup update stable
+      - name: Run quickstart smoke
+        run: bash tools/quickstart-smoke.sh

@@ -4,7 +4,7 @@
 
 ## Requirements
 
-- Tested with Git 2.55.0 on Windows and Git 2.56.0 on Ubuntu and macOS. Git 2.34 is the first version with SSH signing, but is untested; see [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
+- Runtime-tested Git versions with passing evidence are 2.39.5 (Debian 12), 2.43.0 (Ubuntu 24.04), 2.55.0 (Windows 11), 2.56.0 (earlier Ubuntu/macOS CI), and 2.56.1 (latest Ubuntu/macOS CI). Ubuntu 22.04 with Git 2.34.1 failed because Git does not pass `-Overify-time` to `find-principals`. Git 2.35.0 is the first checked release whose source contains `verify-time`, but runtime compatibility is unverified. Versions without passing evidence are untested; see [docs/GIT-INTERFACE.md](GIT-INTERFACE.md) and [issue #67](https://github.com/mujahid313v/quantum-safe-git/issues/67).
 - v0.1 targets Linux and macOS; Windows is supported for development and testing only, and private-key file permissions are not enforced there.
 - Rust 1.88 or newer to build from source.
 
@@ -109,7 +109,7 @@ JSON format is stable under `schema_version: 1`:
 
 Each commit object has `commit` (object ID), `status` (`verified` or `failed`), `fingerprint` (string on success, otherwise null), and `reason` (null on success, otherwise text). Range-level failures such as resolution or trust-source safeguard failures are reported on stderr and exit 1.
 
-`qsg doctor` performs read-only checks of Git, configuration, the shim, trust files, signing key and environment. It exits 0 when there are no ERROR items and 1 when any ERROR item is reported; WARN items do not affect the exit code. It never prints private key contents.
+`qsg doctor` performs read-only checks of Git, configuration, the shim, trust files, signing key and environment. Git older than 2.35.0 produces an ERROR because it does not pass `-Overify-time`. Unlisted versions from 2.35.0 through the newest tested version produce a WARN that runtime support is untested; tested versions produce INFO. A version newer than the newest tested version produces INFO and says it is not yet tested. Unparseable version output produces a WARN. The command exits 0 when there are no ERROR items and 1 when any ERROR item is reported; WARN items do not affect the exit code. It never prints private key contents.
 
 ### Revocation troubleshooting
 

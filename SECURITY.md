@@ -1,26 +1,23 @@
-# Security Policy
+# Security policy
 
-**QSGit is experimental; neither QSGit nor its selected pure-Rust `ml-dsa` backend has been independently audited. Do not use it to protect anything that matters.**
+## Project status and supported versions
 
-## Supported versions
-
-Only the latest commit on `main`. There are no releases yet.
+QSGit is experimental, has not received an independent security audit, and has no release. Security reports apply to the latest commit on `main`; once a release candidate is tagged, the latest release candidate will also be supported.
 
 ## Reporting a vulnerability
 
-Please use GitHub's private vulnerability reporting for this repository (Security tab, "Report a vulnerability").
+For security reports, use GitHub private vulnerability reporting in this repository's Security tab. For conduct reports, contact the maintainer through GitHub at `mujahid313v`.
 
-TODO: enable private vulnerability reporting in the repository settings.
-TODO: add a security contact address.
-TODO: set response-time targets once there is someone to meet them.
+Please include the affected commit or tag, operating system and relevant Git/Rust versions, the impact you observed, and a minimal reproduction. Remove credentials, private keys, passphrases, and other private data from logs before sharing them.
 
-Please do not open public issues for vulnerabilities.
+The maintainer will make a best-effort effort to acknowledge, investigate, and coordinate a fix. There is no response or remediation SLA. Please coordinate public disclosure with the maintainer and allow reasonable time to investigate and prepare a fix.
 
-## What is implemented
+## Scope
 
-Implemented security-relevant functionality includes ML-DSA-65 key generation/sign/verify, SSHSIG encoding, encrypted key storage, allowed-signers validity and revocation checks, the Git signing shim, standalone verification, range verification, trust-file editing, and read-only diagnostics. These implementations are experimental and have not been independently audited; see the threat and trust models for implemented controls and limitations.
+In scope: code and documentation in this repository. Out of scope: defects in stock Git or OpenSSH themselves. Reports about a QSGit interaction with those tools are in scope when the issue is in this repository's code.
 
-## Further reading
+See [THREAT-MODEL.md](docs/THREAT-MODEL.md) for known limitations and assumptions.
 
-- [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md)
-- [docs/TRUST-MODEL.md](docs/TRUST-MODEL.md)
+## Dependency advisories
+
+The time advisory RUSTSEC-2026-0009 is addressed by the `time` 0.3.47 update. Cargo audit still reports RUSTSEC-2023-0071 for `rsa` 0.9.10 and RUSTSEC-2026-0387 for `crypto-bigint` 0.5.5 in `Cargo.lock`. Offline `cargo tree` inverse lookups print no workspace build path for either package; they remain visible in the lockfile and advisory report.

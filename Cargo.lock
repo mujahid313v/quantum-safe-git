@@ -881,7 +881,6 @@ dependencies = [
 name = "qsg-verify"
 version = "0.1.0"
 dependencies = [
- "qsg-keystore",
  "qsg-sshsig",
  "qsg-trust",
  "time",
