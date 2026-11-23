@@ -1,6 +1,6 @@
 # Contributing
 
-QSGit is experimental and moves in small milestones (see the roadmap in the README). Please open an issue before starting anything large.
+QSGit is a release candidate (pre-release); experimental; not independently audited; not for production use. It moves in small milestones (see the roadmap in the README). Please open an issue before starting anything large.
 
 ## Setup
 
@@ -43,3 +43,7 @@ The M1 backend is RustCrypto `ml-dsa` (Apache-2.0 OR MIT); see [ADR 0001](docs/a
 ## Code of conduct
 
 Please read the [Code of Conduct](CODE_OF_CONDUCT.md). For conduct reports, contact the maintainer through GitHub at `mujahid313v`.
+
+## Release process
+
+The source-only v0.1.0-rc.1 release procedure, including tag and archive verification, is documented in [docs/RELEASING.md](docs/RELEASING.md).
