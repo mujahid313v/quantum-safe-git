@@ -32,7 +32,7 @@
 
 ## Mitigations currently implemented
 
-- `qsg-sshsig` rejects unsupported SSHSIG versions, namespaces, reserved/hash fields, key types, malformed lengths, trailing bytes, and oversized input. Property tests exercise arbitrary decoder input; a cargo-fuzz target is available. Latest fuzz campaign results are pending: evidence not provided (`%TEMP%\\fuzz.txt` was absent).
+- `qsg-sshsig` rejects unsupported SSHSIG versions, namespaces, reserved/hash fields, key types, malformed lengths, trailing bytes, and oversized input. Property tests exercise arbitrary decoder input; cargo-fuzz targets are available. On 2026-11-22, a manual 60-second smoke run completed `sshsig decode_blob` with 9,847,145 executions and `trust allowed_signers` with 1,226,798 executions. The supplied log shows both targets completed in 61 seconds and contains no crash, panic, sanitizer, timeout, or `ERROR: libFuzzer` report. This was a smoke run, not a fuzz campaign or security audit.
 - `qsg-keystore` encrypts the ML-DSA seed, bounds Argon2 parameters, authenticates its header, and enforces private Unix modes; this implementation has not been audited.
 - `qsg-trust` enforces exact principals, required Git namespace, bounded parsing, validity windows, and fingerprint revocation; this implementation has not been audited.
 - M5a `qsg-ssh-keygen` prompts for encrypted-key passphrases from the terminal, bounds verification input, rejects unsupported Git call shapes, and connects signature verification with trust checks; it has not been audited.

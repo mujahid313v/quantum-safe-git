@@ -1,6 +1,6 @@
 # QSGit
 
-**Status: Experimental. No releases or independent security audit of QSGit or its selected pure-Rust `ml-dsa` backend. Not for production use.**
+**Status: release candidate (pre-release); experimental; not independently audited; not for production use.**
 
 QSGit is an early-stage project that aims to sign and verify Git commits and tags with a post-quantum signature algorithm, ML-DSA-65 (FIPS 204), using Git's built-in SSH-signature interface. Verification is offline: no server and no network.
 
@@ -16,8 +16,8 @@ An earlier prototype (Dilithium-3, pre-standard parameters) lives on the `legacy
 | M5b: trust, standalone verification, and diagnostics | Merged and implemented; CI passes on Ubuntu and macOS |
 | M6: end-to-end tests, supply-chain checks, and CI hardening | Done (merged in PR #78) |
 | M6.1: advisory and doctor follow-up | Done (merged in PR #84) |
-| M7: documentation and security pass | In review |
-| M8: v0.1.0 release candidate | Planned |
+| M7: documentation and security pass | Done |
+| M8: v0.1.0 release candidate | In review |
 
 M0 through M6.1 are merged and implemented. M5a adds key generation, public-key display, and a Git signing/verifying shim. M5b adds trust management, standalone object/range verification, and diagnostics. M6 adds end-to-end tests and CI hardening. M6.1 updates the time dependency and MSRV and corrects the Git-version guidance.
 
@@ -61,8 +61,8 @@ v0.1 targets Linux and macOS; Windows is supported for development and testing o
 | M5b | `trust`, `verify`, `verify-range`, and `doctor` CLI commands | Merged and implemented; CI passing on Ubuntu and macOS |
 | M6 | End-to-end tests and CI | Done (merged in PR #78); SHA-256 e2e, tampered tag, ACVP pin, supply-chain audit, workflow hardening |
 | M6.1 | Advisory and doctor follow-up | Done (merged in PR #84) |
-| M7 | Documentation and security pass | In review |
-| M8 | v0.1.0 release candidate | Planned |
+| M7 | Documentation and security pass | Done |
+| M8 | v0.1.0 release candidate | In review |
 
 ## Documentation
 
@@ -76,7 +76,11 @@ v0.1 targets Linux and macOS; Windows is supported for development and testing o
 - [SECURITY.md](SECURITY.md)
 - [THIRD-PARTY.md](THIRD-PARTY.md)
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
-- [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md)
+- [CONTRIBUTING.md](CONTRIBUTING.md)
+
+## Releases and verification
+
+The v0.1.0-rc.1 release candidate is source-only: it contains a source archive and `SHA256SUMS`, not Linux or macOS binaries. Authenticity comes from the QSGit-signed Git tag, verified with a release public key whose fingerprint you confirm out of band. `SHA256SUMS` checks archive integrity only and is not separately signed. See [docs/RELEASING.md](docs/RELEASING.md) and [docs/RELEASE-KEY.md](docs/RELEASE-KEY.md).
 
 ## License
 

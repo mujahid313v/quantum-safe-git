@@ -2,7 +2,7 @@
 
 ## Project status and supported versions
 
-QSGit is experimental, has not received an independent security audit, and has no release. Security reports apply to the latest commit on `main`; once a release candidate is tagged, the latest release candidate will also be supported.
+QSGit is a release candidate (pre-release); experimental; not independently audited; not for production use. Supported versions are the latest commit on `main` and `v0.1.0-rc.1` once published.
 
 ## Reporting a vulnerability
 

@@ -1,6 +1,6 @@
 # Build and release
 
-**Status: experimental. The workspace implements ML-DSA-65 signing and verification, key storage, trust parsing, the Git shim, and the `qsg` commands. No independent security audit has been completed.**
+**Status: release candidate (pre-release); experimental; not independently audited; not for production use.**
 
 ## Build
 
@@ -48,7 +48,7 @@ Only the two `check` jobs in `ci.yml` are required PR checks. The required CI wo
 
 The supply-chain workflow installs `cargo-audit 0.22.2` and `cargo-deny 0.20.2` with `--locked` (both MIT OR Apache-2.0). Run the checks locally with `cargo audit` and `cargo deny check` from the workspace root after installing those tools. The audit job reports all findings in its job summary. Scheduled workflows consume private-repo GitHub Actions minutes.
 
-The fuzz workflow uses `cargo-fuzz` on nightly Rust with a 60-second limit per target. Latest fuzz results: pending: evidence not provided (`%TEMP%\\fuzz.txt` was absent).
+The workflow uses `cargo-fuzz` on nightly Rust with a 60-second limit per target. A manual smoke run, not a fuzz campaign, completed `sshsig decode_blob` with 9,847,145 executions and `trust allowed_signers` with 1,226,798 executions on 2026-11-22; both reported 61 seconds. The supplied log contains no crash or error report. These smoke runs are not a security audit.
 
 ### Third-party license inventory
 
@@ -79,13 +79,6 @@ The shorter `-e dev` form prints dev-dependency edges but omits their normal/bui
 
 Pre-1.0 versions `0.x.y`. The first release candidate is `0.1.0`.
 
-## Release steps (planned)
+## Release procedure
 
-1. All checks and CI green.
-2. Update versions and changelog.
-3. Build release binaries for Linux and macOS: `qsg` and `qsg-ssh-keygen`.
-4. Create `SHA256SUMS` covering both binaries.
-5. Sign the tag and `SHA256SUMS` with QSGit itself once it works.
-6. Publish a GitHub release with binaries, `SHA256SUMS` and its signature.
-
-A checksum file downloaded from the same page as the binary does not prove authenticity. Users must verify the signature on `SHA256SUMS` (the verification procedure is written when the release process exists; TODO).
+The v0.1.0-rc.1 release is source-only: a source archive and `SHA256SUMS`; Linux and macOS binaries are planned for a later release. Follow [RELEASING.md](RELEASING.md) for maintainer and user verification steps. Authenticity is provided by the signed Git tag and an out-of-band verified release key. `SHA256SUMS` provides integrity only and is not signed.
